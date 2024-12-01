@@ -2,6 +2,7 @@ package searchengine.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
@@ -12,91 +13,77 @@ import searchengine.model.SiteStatus;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.IndexingService;
+import searchengine.services.RecursiveTaskHandler;
 
-import java.util.List;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
+import java.util.concurrent.ForkJoinPool;
 
 @Service
 @RequiredArgsConstructor
-@Transactional
 @Log4j2
-public class IndexingServiceImpl implements IndexingService {
+@Transactional
+public class IndexingServiceImpl implements IndexingService, CommandLineRunner {
 
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
+    private final RecursiveTaskHandler recursiveTaskHandler;
 
     private final SitesList sites;
 
-    public void deleteTest() {
-        List<String> collect = getSiteStream()
-                .map(Site::getUrl)
-                .toList();
-        String url = collect.iterator().next();
-        siteRepository.deleteByUrl(url);
-    }
-
     @Override
     public void startIndexing() {
+        deleteAllOldData();
 
-        deleteTest();
-        deleteAllRecordsFromSiteRepository();
-        createNewRecordsInSiteRepository();
+        try (ForkJoinPool commonPool = ForkJoinPool.commonPool();){
+            commonPool.invoke(recursiveTaskHandler);
+        }
 
-        //TODO: обходить все страницы, начиная с главной, добавлять их адреса,
-        // - статусы и содержимое в базу данных в таблицу page;
-
-        //TODO: в процессе обхода постоянно обновлять дату и время в поле
-        // - status_time таблицы site на текущее;
-        // - по завершении обхода изменять статус (поле status) на INDEXED;
-        // - если произошла ошибка и обход завершить не удалось, изменять
-        // - статус на FAILED и вносить в поле last_error понятную
-        // - информацию о произошедшей ошибке.
     }
 
-    private void deleteAllRecordsFromSiteRepository() {
-        //TODO:удалять все имеющиеся данные по этому сайту (записи из таблиц site и page);
+    /**
+     *This method deleted all the entities from {@link SiteRepository} and {@link PageRepository}.
+     */
+    public void deleteAllOldData() {
 
-        List<String> urlList = getSiteStream()
-                .map(searchengine.config.Site::getUrl)
-                .toList();
-
-        urlList.forEach(url -> {
-            if (siteRepository.existsByUrl(url)) {
-                siteRepository.deleteByUrl(url);
-                //siteRepository.flush();
-            }
-        });
+        sites.getSites().stream()
+                .map(Site::getUrl)
+                .forEach(siteUrl -> {
+                    siteRepository.findByUrl(siteUrl).ifPresentOrElse(
+                            entity -> {
+                                entity.clearPages();
+                                siteRepository.delete(entity);
+                                siteRepository.flush();
+                            },
+                            () -> log.info("No data to delete were found.")
+                    );
+                });
     }
 
     private void createNewRecordsInSiteRepository() {
-        //TODO:создавать в таблице site новую запись со статусом INDEXING
-        getSiteStream()
-                .forEach(element -> {
+        sites.getSites().forEach(element -> {
 
-                            SiteEntity site = new SiteEntity();
-                            site.setUrl(element.getUrl());
-                            site.setName(element.getName());
-                            site.setStatus(SiteStatus.INDEXING);
-                            siteRepository.save(site);
+                    SiteEntity site = new SiteEntity();
+                    site.setUrl(element.getUrl());
+                    site.setName(element.getName());
+                    site.setStatus(SiteStatus.INDEXING);
+                    siteRepository.save(site);
 
-                            siteRepository.findByUrl(site.getUrl()).ifPresent(
-                                    opt -> {
-                                        Page page = new Page();
-                                        page.setSite(opt);
-                                        page.setPath("/");
-                                        page.setCode(200);
-                                        page.setContent("<html>");
+                    siteRepository.findByUrl(site.getUrl()).ifPresent(
+                            opt -> {
+                                Page page = new Page();
+                                page.setSite(opt);
+                                page.setPath("/");
+                                page.setCode(200);
+                                page.setContent("<html>");
 
-                                        pageRepository.save(page);
-                                    }
-                            );
-                        }
-                );
+                                pageRepository.save(page);
+                            }
+                    );
+                }
+        );
     }
 
-    private Stream<searchengine.config.Site> getSiteStream() {
-        return sites.getSites()
-                .stream();
+    @Override
+    public void run(String... args) throws Exception {
+        startIndexing();
     }
 }

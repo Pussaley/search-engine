@@ -1,29 +1,22 @@
 package searchengine.services.jsoup;
 
-import lombok.NoArgsConstructor;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
-import org.jsoup.nodes.Element;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Random;
-import java.util.regex.Pattern;
 
 @Service
 @Slf4j
-@NoArgsConstructor
-public class JSOUPParser implements CommandLineRunner {
-
-    private static final Random random = new Random();
+public class JSOUPParser {
 
     @Value("${jsoup-props.user-agent}")
     private String userAgent;
@@ -31,16 +24,18 @@ public class JSOUPParser implements CommandLineRunner {
     private String referrer;
     @Value("${jsoup-props.min-time-out}")
     private int minTimeOut;
+    private static final Random random = new Random();
+    private static final List<String> test = new ArrayList<>();
 
-    private Optional<Document> connectToUrl(String url) {
-        Document document = null;
+    private Optional<Document> connectAndGetDocument(String url) {
+        Document document;
 
         try {
             document = Jsoup.connect(url)
                     .method(Connection.Method.GET)
-                    .timeout(minTimeOut + random.nextInt(4500))
                     .userAgent(userAgent)
                     .referrer(referrer)
+                    .timeout(minTimeOut + random.nextInt(4500))
                     .get();
         } catch (IOException e) {
             log.error("Ошибка при попытке парсинга страницы {}: {}", url, e.getMessage());
@@ -50,43 +45,42 @@ public class JSOUPParser implements CommandLineRunner {
         return Optional.of(document);
     }
 
-    public void parseTagAWithHrefAttribute(String url) {
-                connectToUrl(url).ifPresent(
-                document -> {
-                    List<String> list = document.select("a[href]")
-                            .stream()
-                            .filter(this::nonFile)
-                            .filter(this::isInternalLink)
-                            .map(element -> element.attr("href"))
-                            .toList();
+    public List<String> parseAbsoluteURLs(String url) {
 
-                    log.info("check-in: {}", list);
-                }
-        );
-    }
+        List<String> absoluteURLs = new ArrayList<>();
 
-    private boolean isInternalLink(String link) {
-        return link.startsWith("/");
-    }
+        connectAndGetDocument(url).ifPresent(document -> {
 
-    private boolean isInternalLink(Element element) {
-        return isInternalLink(element.attr("href"));
+            document.select("a[href]")
+                    .stream()
+                    .map(element -> element.attr("abs:href"))
+                    .filter(this::nonFile)
+                    .filter(this::splitter)
+                    .limit(100)
+                    .forEachOrdered(absoluteURLs::add);
+            log.info("check-in: {}", absoluteURLs);
+
+        });
+
+        return absoluteURLs;
     }
 
     private boolean nonFile(String link) {
-        return Pattern
-                .compile("^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^\\.]+$")
+
+        return java.util.regex.Pattern
+                .compile("^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^(\\.\\#)]+$")
                 .matcher(link)
                 .matches();
     }
 
-    private boolean nonFile(Element element) {
-        return nonFile(element.attr("href"));
-    }
-
-    @Override
-    public void run(String... args) throws Exception {
-        String root = "https://lenta.ru/";
-        parseTagAWithHrefAttribute(root);
+    private boolean splitter(String absoluteURL) {
+        if (!absoluteURL.endsWith("/"))
+            absoluteURL = absoluteURL.concat("/");
+        String[] split = absoluteURL.split("://");
+        String[] root = split[1].split("/");
+        if (!test.contains(root[0])) {
+            test.add(root[0]);
+        }
+        return true;
     }
 }
