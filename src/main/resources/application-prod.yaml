@@ -1,0 +1,8 @@
+indexing-settings:
+  sites:
+    - url: https://www.lenta.ru
+      name: lenta
+    - url: https://www.skillbox.ru
+      name: skillbox
+    - url: https://www.playback.ru
+      name: playback
