@@ -4,7 +4,7 @@ import org.mapstruct.Mapper;
 import searchengine.dto.entity.SiteDTO;
 import searchengine.model.SiteEntity;
 
-@Mapper
+@Mapper(componentModel = "spring")
 public interface SiteMapper {
 
     SiteDTO toDTO(SiteEntity siteEntity);

@@ -7,7 +7,7 @@ import java.util.concurrent.ForkJoinPool;
 
 @Slf4j
 @RequiredArgsConstructor
-public class ActionImpl implements Action {
+public class RecursiveActionImpl implements RecursiveAction {
     private final RecursiveActionHandler handler;
 
     @Override
@@ -16,7 +16,7 @@ public class ActionImpl implements Action {
             ForkJoinPool commonPool = ForkJoinPool.commonPool();
             commonPool.invoke(handler);
         } catch (Exception exception) {
-            log.error("Exception: {}", exception.getCause());
+            log.error("Exception: {}", exception.getMessage());
             exception.printStackTrace();
         }
     }

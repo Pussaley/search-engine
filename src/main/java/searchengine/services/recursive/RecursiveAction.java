@@ -1,5 +1,5 @@
 package searchengine.services.recursive;
 
-public interface Action {
+public interface RecursiveAction {
     void start();
 }
