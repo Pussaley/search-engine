@@ -46,6 +46,6 @@ public class SiteEntity {
     private List<Page> pages;
 
     public void clearPages() {
-        pages.stream().forEach(page -> page = null);
+        pages.forEach(page -> page = null);
     }
 }

@@ -13,30 +13,27 @@ import searchengine.model.SiteStatus;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.IndexingService;
-import searchengine.services.RecursiveTaskHandler;
+import searchengine.services.recursive.ActionImpl;
+import searchengine.services.recursive.RecursiveActionHandler;
 
-import java.util.concurrent.ForkJoinPool;
 
-@Service
 @RequiredArgsConstructor
 @Log4j2
 @Transactional
+@Service
 public class IndexingServiceImpl implements IndexingService, CommandLineRunner {
 
+    private final SitesList sites;
     private final SiteRepository siteRepository;
     private final PageRepository pageRepository;
-    private final RecursiveTaskHandler recursiveTaskHandler;
-
-    private final SitesList sites;
 
     @Override
     public void startIndexing() {
         deleteAllOldData();
-
-        try (ForkJoinPool commonPool = ForkJoinPool.commonPool();){
-            commonPool.invoke(recursiveTaskHandler);
-        }
-
+        sites.getSites().forEach(site -> {
+            ActionImpl action = new ActionImpl(new RecursiveActionHandler(site));
+            action.start();
+        });
     }
 
     /**

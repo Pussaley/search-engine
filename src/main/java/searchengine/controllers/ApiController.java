@@ -10,8 +10,6 @@ import org.springframework.web.bind.annotation.RestController;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
-import searchengine.services.impl.IndexingServiceImpl;
-import searchengine.services.impl.StatisticsServiceImpl;
 
 @RestController
 @RequestMapping("/api")
