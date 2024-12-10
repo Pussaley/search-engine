@@ -1,4 +1,4 @@
-package searchengine.services;
+package searchengine.services.mediators;
 
 import org.springframework.stereotype.Service;
 import searchengine.dto.entity.SiteDTO;

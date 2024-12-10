@@ -9,9 +9,11 @@ import searchengine.config.SitesList;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.IndexingService;
+import searchengine.services.PageService;
+import searchengine.services.SiteService;
 import searchengine.services.recursive.RecursiveAction;
-import searchengine.services.recursive.RecursiveActionImpl;
 import searchengine.services.recursive.RecursiveActionHandler;
+import searchengine.services.recursive.RecursiveActionImpl;
 
 @RequiredArgsConstructor
 @Log4j2
@@ -20,8 +22,8 @@ import searchengine.services.recursive.RecursiveActionHandler;
 public class IndexingServiceImpl implements IndexingService {
 
     private final SitesList sites;
-    private final SiteRepository siteRepository;
-    private final PageRepository pageRepository;
+    private final SiteService siteService;
+    private final PageService pageService;
 
     @Override
     public void startIndexing() {
@@ -37,17 +39,17 @@ public class IndexingServiceImpl implements IndexingService {
      */
     private void deleteAllOldData() {
 
-        sites.getSites().stream()
-                .map(Site::getUrl)
-                .forEach(siteUrl -> {
-                    siteRepository.findByUrl(siteUrl).ifPresentOrElse(
-                            entity -> {
-                                entity.clearPages();
-                                siteRepository.delete(entity);
-                                siteRepository.flush();
-                            },
-                            () -> log.info("No data to delete were found.")
-                    );
-                });
+//        sites.getSites().stream()
+//                .map(Site::getUrl)
+//                .forEach(siteUrl -> {
+//                    pageService.findByUrl(siteUrl).ifPresentOrElse(
+//                            entity -> {
+//                                entity.clearPages();
+//                                siteRepository.delete(entity);
+//                                siteRepository.flush();
+//                            },
+//                            () -> log.info("No data to delete were found.")
+//                    );
+//                });
     }
 }

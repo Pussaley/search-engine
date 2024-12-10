@@ -3,7 +3,6 @@ package searchengine.services.recursive;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import searchengine.config.Site;
-import searchengine.services.PageServiceConnector;
 import searchengine.services.jsoup.JSOUPParser;
 
 import java.util.Collection;
@@ -17,7 +16,6 @@ public class RecursiveActionHandler extends RecursiveAction {
     private JSOUPParser parser = new JSOUPParser();
     private static final List<String> parsedURLs = new CopyOnWriteArrayList<>();
     private final String root;
-    private PageServiceConnector pageServiceConnector;
 
     public RecursiveActionHandler(Site site) {
         this(site.getUrl());
@@ -29,7 +27,6 @@ public class RecursiveActionHandler extends RecursiveAction {
 
     @Override
     protected void compute() {
-
         /*TODO: рекурсивный обход
          * 1) парсинг ссылки на наличие вложенных ссылок
          * 2) проверка ссылок
@@ -44,8 +41,8 @@ public class RecursiveActionHandler extends RecursiveAction {
         foundURLs.forEach(link -> {
             Connection.Response response = parser.executeRequest(link);
             pageServiceConnector.savePage(response, link);
+            parsedURLs.add(link);
         });
-
     }
 
     private synchronized boolean ifParsed(String link) {

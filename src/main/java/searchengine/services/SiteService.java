@@ -5,7 +5,7 @@ import searchengine.model.SiteEntity;
 
 import java.util.Optional;
 
-public interface SiteService {
+public interface SiteService extends Service {
     Optional<SiteEntity> findByUrl(String url);
     SiteDTO save(SiteDTO siteDTO);
 }
