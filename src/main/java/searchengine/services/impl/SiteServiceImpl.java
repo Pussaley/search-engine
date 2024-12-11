@@ -7,26 +7,33 @@ import searchengine.dto.entity.SiteDTO;
 import searchengine.mappers.SiteMapper;
 import searchengine.model.SiteEntity;
 import searchengine.repository.SiteRepository;
-import searchengine.services.SiteService;
 
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class SiteServiceImpl implements SiteService {
+public class SiteServiceImpl {
 
     private final SiteRepository siteRepository;
     private final SiteMapper siteMapper;
 
-    @Override
-    public Optional<SiteEntity> findByUrl(String url) {
-        return siteRepository.findByUrl(url);
+    public Optional<SiteDTO> findByUrl(String url) {
+        return siteRepository.findByUrl(url)
+                .map(siteMapper::toDTO);
     }
 
-    @Override
     public SiteDTO save(SiteDTO siteDTO) {
         SiteEntity entity = siteMapper.toEntity(siteDTO);
-        return siteMapper.toDTO(siteRepository.save(entity));
+        SiteEntity savedEntity = siteRepository.save(entity);
+        return siteMapper.toDTO(savedEntity);
+    }
+
+    public boolean deleteSite(SiteDTO siteDTO) {
+        SiteEntity entity = siteMapper.toEntity(siteDTO);
+        entity.clearPages();
+        siteRepository.delete(entity);
+        siteRepository.flush();
+        return true;
     }
 }

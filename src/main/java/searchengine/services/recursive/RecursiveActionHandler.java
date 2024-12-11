@@ -1,13 +1,15 @@
 package searchengine.services.recursive;
 
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Connection;
 import searchengine.config.Site;
 import searchengine.services.jsoup.JSOUPParser;
 
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.ForkJoinPool;
+import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 
 @Slf4j
@@ -37,12 +39,15 @@ public class RecursiveActionHandler extends RecursiveAction {
          */
 
         //1)
+        List<ForkJoinTask<Void>> tasks = new ArrayList<>();
         Collection<String> foundURLs = parser.parseAbsoluteLinks(root);
-        foundURLs.forEach(link -> {
-            Connection.Response response = parser.executeRequest(link);
-            pageServiceConnector.savePage(response, link);
-            parsedURLs.add(link);
-        });
+        if (!foundURLs.isEmpty()) {
+            foundURLs.stream()
+                    .map(RecursiveActionHandler::new)
+                    .forEach(tasks::add);
+            invokeAll(tasks);
+        }
+        tasks.forEach(ForkJoinTask::join);
     }
 
     private synchronized boolean ifParsed(String link) {

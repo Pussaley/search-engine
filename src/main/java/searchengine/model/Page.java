@@ -1,5 +1,6 @@
 package searchengine.model;
 
+import jakarta.persistence.Index;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -22,7 +23,7 @@ import java.util.List;
 @Getter
 @Setter
 @NoArgsConstructor
-@Table(name = "pages")
+@Table(name = "pages", indexes = @Index(name = "page_path_idx", columnList = "path"))
 public class Page {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

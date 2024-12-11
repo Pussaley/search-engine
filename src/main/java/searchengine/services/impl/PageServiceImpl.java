@@ -7,12 +7,13 @@ import searchengine.dto.entity.PageDTO;
 import searchengine.mappers.PageMapper;
 import searchengine.model.Page;
 import searchengine.repository.PageRepository;
-import searchengine.services.PageService;
+
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class PageServiceImpl implements PageService {
+public class PageServiceImpl {
 
     private final PageRepository pageRepository;
     private final PageMapper pageMapper;
@@ -21,9 +22,13 @@ public class PageServiceImpl implements PageService {
         return pageRepository.existsByPath(path);
     }
 
-    @Override
     public PageDTO save(PageDTO pageDTO) {
         Page entity = pageMapper.toEntity(pageDTO);
         return pageMapper.toDTO(pageRepository.save(entity));
+    }
+
+    public Optional<PageDTO> findByPath(String path) {
+        return pageRepository.findByPath(path)
+                .map(pageMapper::toDTO);
     }
 }
