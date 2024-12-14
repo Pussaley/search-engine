@@ -1,24 +1,21 @@
 package searchengine.services.jsoup;
 
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Service;
+import searchengine.config.URLUtils;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.Collection;
-import java.util.List;
 import java.util.Random;
+import java.util.stream.Collectors;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
-public class JSOUPParser implements CommandLineRunner {
+public class JSOUPParser{
 
     @Value("${jsoup-props.user-agent}")
     private String userAgent;
@@ -26,7 +23,12 @@ public class JSOUPParser implements CommandLineRunner {
     private String referrer;
     @Value("${jsoup-props.min-time-out}")
     private int minTimeOut;
-    private static final Random random = new Random();
+    private static Random random = new Random();
+    private URLUtils utils;
+
+    public JSOUPParser() {
+        this.utils = new URLUtils();
+    }
 
     public Connection.Response executeRequest(String url) {
         final int timeOut = minTimeOut + random.nextInt(4500);
@@ -55,20 +57,16 @@ public class JSOUPParser implements CommandLineRunner {
     }
 
     public Collection<String> parseAbsoluteLinks(String url) {
-        List<String> absLinks = new ArrayList<>();
+        String parsedRootURL = URLUtils.parseRootURL(url);
 
-        connectToUrlAndGetDocument(url)
-                .select("a[href~=^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^(\\.\\#)]+$]")
+        return connectToUrlAndGetDocument(url).select("a[href~=^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^(\\.\\#)]+$]")
                 .stream()
                 .map(element -> element.attr("abs:href"))
-                .forEach(absLinks::add);
-
-        return absLinks;
+                .filter(link -> link.contains(parsedRootURL))
+                .collect(Collectors.toSet());
     }
 
-    @Override
-    public void run(String... args) throws Exception {
-        String root = "https://www.ozon.ru/";
-        //parseAbsURLs(root);
+    private boolean filter(String link) {
+        return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
     }
 }
