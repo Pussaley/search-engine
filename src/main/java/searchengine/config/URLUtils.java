@@ -13,6 +13,10 @@ public class URLUtils {
         return link.endsWith("/") ? link : link.concat("/");
     }
 
+    public static synchronized String repairLink(String link) {
+        return link.endsWith("/") ? link : link.concat("/");
+    }
+
     public static synchronized boolean filterTest(String link) {
         link = checkTest(link);
         return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");

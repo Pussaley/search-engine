@@ -2,6 +2,7 @@ package searchengine.services.recursive;
 
 import lombok.extern.slf4j.Slf4j;
 import searchengine.config.Site;
+import searchengine.config.URLUtils;
 import searchengine.services.jsoup.JSOUPParser;
 
 import java.util.Collection;
@@ -15,11 +16,11 @@ public class RecursiveActionHandler extends RecursiveAction {
     private final String urlToParse;
 
     public RecursiveActionHandler(Site site) {
-        this.urlToParse = site.getUrl();
+        this(site.getUrl());
     }
 
     public RecursiveActionHandler(String url) {
-        this.urlToParse = url;
+        this.urlToParse = URLUtils.repairLink(url);
     }
 
     @Override
@@ -29,12 +30,16 @@ public class RecursiveActionHandler extends RecursiveAction {
         Collection<String> foundURLs = parser.parseAbsoluteLinks(urlToParse);
         foundURLs.removeIf(parsedURLs::contains);
 
+        //TODO: убрать цикличность, есть проблема, что ссылки парсятся повторно
+
         if (!foundURLs.isEmpty()) {
-            log.info("Добавляем {} в репозиторий", urlToParse);
             parsedURLs.add(urlToParse);
-            foundURLs.stream()
-                    .map(RecursiveActionHandler::new)
-                    .forEach(ForkJoinTask::invoke);
+            log.info("Добавили {}", urlToParse);
+            ForkJoinTask
+                    .invokeAll(foundURLs.stream()
+                            .map(RecursiveActionHandler::new)
+                            .toList())
+                    .forEach(ForkJoinTask::join);
         }
     }
 }
