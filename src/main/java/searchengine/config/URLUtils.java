@@ -16,18 +16,14 @@ public class URLUtils {
     public static synchronized String parseRootURL(String link) {
         String httpRegexp = "://";
 
+        if (!link.endsWith("/"))
+            link = link.concat("/");
         int index = link.indexOf(httpRegexp);
         int fromIndex = index + httpRegexp.length();
         int secIndex = link.indexOf("/", fromIndex);
-
-        return link.substring(fromIndex, secIndex);
+//        log.info("Link: {}", link);
+        String result = link.substring(fromIndex, secIndex);
+//        log.info("Result: {}", result);
+        return result;
     }
-
-//    private synchronized String getRootURL(String absoluteURL) {
-//        String[] split = absoluteURL.split("://");
-//        return split[1].split("/")[0];
-//    }
-//    private synchronized String getRootURL(Site site) {
-//        return getRootURL(site.getUrl());
-//    }
 }

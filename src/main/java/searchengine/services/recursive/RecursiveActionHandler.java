@@ -30,6 +30,7 @@ public class RecursiveActionHandler extends RecursiveAction {
         foundURLs.removeIf(parsedURLs::contains);
 
         if (!foundURLs.isEmpty()) {
+            log.info("Добавляем {} в репозиторий", urlToParse);
             parsedURLs.add(urlToParse);
             foundURLs.stream()
                     .map(RecursiveActionHandler::new)

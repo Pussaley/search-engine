@@ -1,10 +1,13 @@
 package searchengine.services.jsoup;
 
+import lombok.Data;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 import searchengine.config.URLUtils;
 
@@ -13,9 +16,10 @@ import java.util.Collection;
 import java.util.Random;
 import java.util.stream.Collectors;
 
-@Service
 @Slf4j
-public class JSOUPParser{
+@Component
+@Data
+public class JSOUPParser implements CommandLineRunner {
 
     @Value("${jsoup-props.user-agent}")
     private String userAgent;
@@ -23,14 +27,17 @@ public class JSOUPParser{
     private String referrer;
     @Value("${jsoup-props.min-time-out}")
     private int minTimeOut;
-    private static Random random = new Random();
-    private URLUtils utils;
+    private static final Random random = new Random();
+    private final URLUtils utils;
 
     public JSOUPParser() {
         this.utils = new URLUtils();
     }
 
     public Connection.Response executeRequest(String url) {
+        log.info("Вывод из метода executeRequest:");
+        log.info(userAgent);
+        log.info(referrer);
         final int timeOut = minTimeOut + random.nextInt(4500);
         Connection.Response response = null;
         try {
@@ -68,5 +75,12 @@ public class JSOUPParser{
 
     private boolean filter(String link) {
         return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        log.info("Вывод из метода run:");
+        log.info(userAgent);
+        log.info(referrer);
     }
 }
