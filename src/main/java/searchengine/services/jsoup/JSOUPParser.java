@@ -12,21 +12,23 @@ import org.springframework.stereotype.Service;
 import searchengine.config.URLUtils;
 
 import java.io.IOException;
+import java.net.SocketTimeoutException;
 import java.util.Collection;
+import java.util.Optional;
 import java.util.Random;
 import java.util.stream.Collectors;
 
 @Slf4j
 @Component
 @Data
-public class JSOUPParser implements CommandLineRunner {
+public class JSOUPParser {
 
     @Value("${jsoup-props.user-agent}")
-    private String userAgent;
+    private String userAgent; // = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36";
     @Value("${jsoup-props.referrer}")
-    private String referrer;
+    private String referrer; // = "https://www.google.com/";
     @Value("${jsoup-props.min-time-out}")
-    private int minTimeOut;
+    private int minTimeOut; // = 500;
     private static final Random random = new Random();
     private final URLUtils utils;
 
@@ -35,10 +37,7 @@ public class JSOUPParser implements CommandLineRunner {
     }
 
     public Connection.Response executeRequest(String url) {
-        log.info("Вывод из метода executeRequest:");
-        log.info(userAgent);
-        log.info(referrer);
-        final int timeOut = minTimeOut + random.nextInt(4500);
+        int timeOut = minTimeOut + random.nextInt(4500);
         Connection.Response response = null;
         try {
             response = Jsoup.connect(url)
@@ -47,9 +46,14 @@ public class JSOUPParser implements CommandLineRunner {
                     .referrer(referrer)
                     .timeout(timeOut)
                     .execute();
+        } catch (SocketTimeoutException socketTimeoutException) {
+            log.error("SocketTimeoutException were thrown while executing the request to {}", url);
+            log.error("Error: {}", socketTimeoutException.getCause());
         } catch (IOException e) {
-            log.error("Error while executing request: {}", e.getMessage());
+            log.error("Error while executing request to: {}", url);
+            log.error("Error: {}", e.getMessage());
         }
+
         return response;
     }
 
@@ -65,7 +69,6 @@ public class JSOUPParser implements CommandLineRunner {
 
     public Collection<String> parseAbsoluteLinks(String url) {
         String parsedRootURL = URLUtils.parseRootURL(url);
-
         return connectToUrlAndGetDocument(url).select("a[href~=^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^(\\.\\#)]+$]")
                 .stream()
                 .map(element -> element.attr("abs:href"))
@@ -73,14 +76,7 @@ public class JSOUPParser implements CommandLineRunner {
                 .collect(Collectors.toSet());
     }
 
-    private boolean filter(String link) {
+    private boolean filterTest(String link) {
         return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
-    }
-
-    @Override
-    public void run(String... args) throws Exception {
-        log.info("Вывод из метода run:");
-        log.info(userAgent);
-        log.info(referrer);
     }
 }

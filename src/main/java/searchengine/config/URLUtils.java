@@ -8,22 +8,23 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @NoArgsConstructor
 public class URLUtils {
-    public static synchronized String getRelURL(String url) {
-        String root = parseRootURL(url);
-        return url.split(root)[1];
+
+    private static synchronized String checkTest(String link) {
+        return link.endsWith("/") ? link : link.concat("/");
+    }
+
+    public static synchronized boolean filterTest(String link) {
+        link = checkTest(link);
+        return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
     }
 
     public static synchronized String parseRootURL(String link) {
-        String httpRegexp = "://";
+        String regexp = link.contains("://www.") ? "://www." : "://";
+        link = checkTest(link);
 
-        if (!link.endsWith("/"))
-            link = link.concat("/");
-        int index = link.indexOf(httpRegexp);
-        int fromIndex = index + httpRegexp.length();
-        int secIndex = link.indexOf("/", fromIndex);
-//        log.info("Link: {}", link);
-        String result = link.substring(fromIndex, secIndex);
-//        log.info("Result: {}", result);
-        return result;
+        int fromIndex = link.indexOf(regexp) + regexp.length();
+        int toIndex = link.indexOf("/", fromIndex);
+
+        return link.substring(fromIndex, toIndex);
     }
 }
