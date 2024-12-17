@@ -2,7 +2,6 @@ package searchengine.dto.entity;
 
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import searchengine.model.SiteEntity;
 
 @Data
 @NoArgsConstructor

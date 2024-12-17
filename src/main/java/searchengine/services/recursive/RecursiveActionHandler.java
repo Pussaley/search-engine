@@ -2,12 +2,13 @@ package searchengine.services.recursive;
 
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
-import searchengine.config.Site;
 import searchengine.config.SearchEngineApplicationContext;
+import searchengine.config.Site;
 import searchengine.config.URLUtils;
 import searchengine.dto.entity.PageDTO;
 import searchengine.dto.entity.SiteDTO;
-import searchengine.services.ServiceConnector;
+import searchengine.services.CRUDService;
+import searchengine.services.impl.PageServiceImpl;
 import searchengine.services.jsoup.JSOUPParser;
 
 import java.util.Collection;
@@ -30,12 +31,14 @@ public class RecursiveActionHandler extends RecursiveAction {
 
     @Override
     protected void compute() {
-        ServiceConnector serviceConnector =
-                SearchEngineApplicationContext.getBean(ServiceConnector.class);
+        CRUDService<PageDTO> pageService =
+                SearchEngineApplicationContext.getBean(PageServiceImpl.class);
         JSOUPParser parser =
                 SearchEngineApplicationContext.getBean(JSOUPParser.class);
 
         Collection<String> foundURLs = parser.parseAbsoluteLinks(urlToParse);
+        log.info("{}", foundURLs);
+
         foundURLs.removeIf(parsedURLs::contains);
 
         if (!foundURLs.isEmpty()) {
@@ -49,7 +52,7 @@ public class RecursiveActionHandler extends RecursiveAction {
             pageDTO.setPath(parser.parsePath(urlToParse));
             pageDTO.setSite(new SiteDTO()); // ?
 
-            serviceConnector.savePage(new PageDTO());
+            pageService.save(pageDTO);
 
             log.info("Добавили {}", urlToParse);
             ForkJoinTask

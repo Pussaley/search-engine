@@ -71,15 +71,25 @@ public class JSOUPParser {
 
     public Collection<String> parseAbsoluteLinks(String url) {
         String parsedRootURL = URLUtils.parseRootURL(url);
-        return connectToUrlAndGetDocument(url).select("a[href~=^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^(\\.\\#)]+$]")
+
+        return connectToUrlAndGetDocument(url)
+                .select("a:matches(^((http(s)?(\\:{1,2})\\/*)?[\\w\\.\\-]+)?\\/?[^(\\.\\#)]+$)")
                 .stream()
                 .map(element -> element.attr("abs:href"))
-                .filter(link -> link.contains(parsedRootURL)) //TODO: усовершенствовать фильтр
+                .map(URLUtils::repairLink)
+                .filter((l) -> URLUtils.isSubLink(parsedRootURL, l))
                 .collect(Collectors.toSet());
     }
 
     private boolean filterTest(String link) {
         return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
+    }
+
+    public Collection<String> parseRelativeLinks(String url) {
+        return parseAbsoluteLinks(url)
+                .stream()
+                .map(URLUtils::parseRelURL)
+                .collect(Collectors.toSet());
     }
 
     public String parsePath(String url) {

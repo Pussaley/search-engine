@@ -7,19 +7,26 @@ import searchengine.dto.entity.PageDTO;
 import searchengine.mappers.PageMapper;
 import searchengine.model.Page;
 import searchengine.repository.PageRepository;
+import searchengine.services.CRUDService;
 
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class PageServiceImpl {
+public class PageServiceImpl implements CRUDService<PageDTO> {
 
     private final PageRepository pageRepository;
     private final PageMapper pageMapper;
 
-    public boolean existsByPath(String path) {
-        return pageRepository.existsByPath(path);
+    @Override
+    public Optional<PageDTO> getById(Long id) {
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean deleteById(Long id) {
+        return false;
     }
 
     public PageDTO save(PageDTO pageDTO) {
@@ -30,5 +37,9 @@ public class PageServiceImpl {
     public Optional<PageDTO> findByPath(String path) {
         return pageRepository.findByPath(path)
                 .map(pageMapper::toDTO);
+    }
+
+    public boolean existsByPath(String path) {
+        return pageRepository.existsByPath(path);
     }
 }
