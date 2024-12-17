@@ -30,4 +30,8 @@ public class ServiceConnector {
     public boolean deleteSite(SiteDTO siteDTO) {
         return siteService.deleteSite(siteDTO);
     }
+
+    public void savePage(PageDTO pageDTO) {
+        pageService.save(pageDTO);
+    }
 }

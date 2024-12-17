@@ -81,4 +81,8 @@ public class JSOUPParser {
     private boolean filterTest(String link) {
         return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
     }
+
+    public String parsePath(String url) {
+        return url.substring(url.indexOf("/"));
+    }
 }

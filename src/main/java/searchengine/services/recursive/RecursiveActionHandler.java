@@ -1,8 +1,13 @@
 package searchengine.services.recursive;
 
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
 import searchengine.config.Site;
+import searchengine.config.SearchEngineApplicationContext;
 import searchengine.config.URLUtils;
+import searchengine.dto.entity.PageDTO;
+import searchengine.dto.entity.SiteDTO;
+import searchengine.services.ServiceConnector;
 import searchengine.services.jsoup.JSOUPParser;
 
 import java.util.Collection;
@@ -25,15 +30,27 @@ public class RecursiveActionHandler extends RecursiveAction {
 
     @Override
     protected void compute() {
-        JSOUPParser parser = new JSOUPParser();
+        ServiceConnector serviceConnector =
+                SearchEngineApplicationContext.getBean(ServiceConnector.class);
+        JSOUPParser parser =
+                SearchEngineApplicationContext.getBean(JSOUPParser.class);
 
         Collection<String> foundURLs = parser.parseAbsoluteLinks(urlToParse);
         foundURLs.removeIf(parsedURLs::contains);
 
-        //TODO: убрать цикличность, есть проблема, что ссылки парсятся повторно
-
         if (!foundURLs.isEmpty()) {
             parsedURLs.add(urlToParse);
+
+            Connection.Response response = parser.executeRequest(urlToParse);
+
+            PageDTO pageDTO = new PageDTO();
+            pageDTO.setCode(response.statusCode());
+            pageDTO.setContent(response.body());
+            pageDTO.setPath(parser.parsePath(urlToParse));
+            pageDTO.setSite(new SiteDTO()); // ?
+
+            serviceConnector.savePage(new PageDTO());
+
             log.info("Добавили {}", urlToParse);
             ForkJoinTask
                     .invokeAll(foundURLs.stream()
