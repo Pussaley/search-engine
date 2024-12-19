@@ -18,7 +18,7 @@ import java.util.concurrent.RecursiveAction;
 
 @Slf4j
 public class RecursiveActionHandler extends RecursiveAction {
-    private static final Collection<String> parsedURLs = new CopyOnWriteArraySet<>();
+    public static final Collection<String> parsedURLs = new CopyOnWriteArraySet<>();
     private final String urlToParse;
 
     public RecursiveActionHandler(Site site) {
@@ -37,13 +37,12 @@ public class RecursiveActionHandler extends RecursiveAction {
                 SearchEngineApplicationContext.getBean(JSOUPParser.class);
 
         Collection<String> foundURLs = parser.parseAbsoluteLinks(urlToParse);
-        log.info("{}", foundURLs);
 
         foundURLs.removeIf(parsedURLs::contains);
 
         if (!foundURLs.isEmpty()) {
             parsedURLs.add(urlToParse);
-
+/*
             Connection.Response response = parser.executeRequest(urlToParse);
 
             PageDTO pageDTO = new PageDTO();
@@ -52,7 +51,7 @@ public class RecursiveActionHandler extends RecursiveAction {
             pageDTO.setPath(parser.parsePath(urlToParse));
             pageDTO.setSite(new SiteDTO()); // ?
 
-            pageService.save(pageDTO);
+            pageService.save(pageDTO);*/
 
             log.info("Добавили {}", urlToParse);
             ForkJoinTask

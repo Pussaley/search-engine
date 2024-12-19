@@ -16,6 +16,7 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
+
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -42,7 +43,10 @@ public class SiteEntity {
     @Column(name = "name", columnDefinition = "VARCHAR(255)", nullable = false)
     private String name;
 
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "site", orphanRemoval = true)
+    @OneToMany(
+            cascade = CascadeType.ALL,
+            mappedBy = "site",
+            orphanRemoval = true)
     private List<Page> pages;
 
     public void clearPages() {

@@ -1,5 +1,6 @@
 package searchengine.model;
 
+import jakarta.persistence.CascadeType;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -30,6 +31,15 @@ public class Lemma {
     @Column(name = "frequency", nullable = false)
     private Integer frequency;
 
-    @ManyToMany(fetch = FetchType.LAZY, mappedBy = "lemmas")
+    @ManyToMany(
+            fetch = FetchType.LAZY,
+            mappedBy = "lemmas",
+            cascade = {
+                    CascadeType.DETACH,
+                    CascadeType.MERGE,
+                    CascadeType.PERSIST,
+                    CascadeType.MERGE,
+                    CascadeType.REFRESH
+            })
     private List<Page> pages;
 }

@@ -9,22 +9,16 @@ import org.springframework.stereotype.Component;
 @NoArgsConstructor
 public class URLUtils {
     public static synchronized String repairLink(String link) {
-        return link.endsWith("/") ? link : link.concat("/");
-    }
-
-    public static synchronized boolean filterTest(String link) {
-        link = repairLink(link);
-        return String.valueOf(link.charAt(0)).equalsIgnoreCase("/") && !link.matches("\\.\\w+");
+        return link.endsWith("/") ? link.substring(0, link.length() - 1) : link ;
     }
 
     public static synchronized String parseRootURL(String link) {
-        String regexp = link.contains("://www.") ? "://www." : "://";
+        String regexp = getRegExp(link);
         link = repairLink(link);
 
         int fromIndex = link.indexOf(regexp) + regexp.length();
-        int toIndex = link.indexOf("/", fromIndex);
 
-        return link.substring(fromIndex, toIndex);
+        return link.substring(fromIndex);
     }
 
     public static boolean isSubLink(String root, String link) {
@@ -32,10 +26,33 @@ public class URLUtils {
     }
 
     public synchronized static String parseRelURL(String link) {
+        if (link.startsWith("/"))
+            return link;
+
         link = repairLink(link);
-        String regexp = link.contains("://www.") ? "://www." : "://";
+        String regexp = getRegExp(link);
 
         String result = link.substring(link.indexOf(regexp) + regexp.length());
         return result.substring(result.indexOf("/"));
+    }
+
+    public synchronized static boolean isMainURL(String link) {
+        if (link.startsWith("/") && link.length() > 1)
+            return false;
+
+        link = parseRelURL(link);
+        return link.equalsIgnoreCase("/");
+    }
+
+    public synchronized static boolean notMainURL(String link) {
+        return !isMainURL(link);
+    }
+
+    private synchronized static String getRegExp(String link) {
+        return link.contains("://www.")
+                ? "://www."
+                : link.contains("://")
+                        ? "://"
+                        : "/";
     }
 }

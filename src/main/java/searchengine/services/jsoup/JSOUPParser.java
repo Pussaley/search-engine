@@ -89,6 +89,7 @@ public class JSOUPParser {
         return parseAbsoluteLinks(url)
                 .stream()
                 .map(URLUtils::parseRelURL)
+                .filter(URLUtils::notMainURL)
                 .collect(Collectors.toSet());
     }
 
