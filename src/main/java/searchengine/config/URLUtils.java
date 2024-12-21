@@ -1,6 +1,7 @@
 package searchengine.config;
 
 import lombok.NoArgsConstructor;
+import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -8,8 +9,32 @@ import org.springframework.stereotype.Component;
 @Slf4j
 @NoArgsConstructor
 public class URLUtils {
+
+    public static synchronized boolean filterCorrectLinks(String link) {
+        String result = removeAnchors(link);
+        result = removeEndBackslash(result);
+        return notFile(result);
+    }
+    private static synchronized String removeEndBackslash(String link) {
+        return getLastChar(link).equalsIgnoreCase("/")
+                ? link.substring(0, link.length() - 1)
+                : link ;
+    }
+
     public static synchronized String repairLink(String link) {
-        return link.endsWith("/") ? link.substring(0, link.length() - 1) : link ;
+        return removeEndBackslash(link);
+    }
+
+    public static synchronized boolean isMarkedURL(String link) {
+        return link.startsWith("#");
+    }
+
+    public static synchronized boolean notMarkedURL(String link) {
+        return !isMarkedURL(link);
+    }
+
+    private synchronized static String getLastChar(String link) {
+        return link.substring(link.length() - 1);
     }
 
     public static synchronized String parseRootURL(String link) {
@@ -19,10 +44,6 @@ public class URLUtils {
         int fromIndex = link.indexOf(regexp) + regexp.length();
 
         return link.substring(fromIndex);
-    }
-
-    public static boolean isSubLink(String root, String link) {
-        return link.contains(root);
     }
 
     public synchronized static String parseRelURL(String link) {
@@ -52,7 +73,20 @@ public class URLUtils {
         return link.contains("://www.")
                 ? "://www."
                 : link.contains("://")
-                        ? "://"
-                        : "/";
+                ? "://"
+                : "/";
+    }
+
+    public synchronized static boolean isSubLink(String parsedRootURL, String l) {
+        return l.contains(parsedRootURL);
+    }
+
+
+    private static synchronized boolean notFile(String link) {
+        return !link.matches(".*\\/.*\\.(.)*\\z");
+    }
+
+    private static synchronized String removeAnchors(String link) {
+        return link.contains("#") ? link.substring(0, link.indexOf("#")) : link;
     }
 }

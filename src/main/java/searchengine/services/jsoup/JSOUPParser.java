@@ -78,6 +78,7 @@ public class JSOUPParser {
                 .map(element -> element.attr("abs:href"))
                 .map(URLUtils::repairLink)
                 .filter((l) -> URLUtils.isSubLink(parsedRootURL, l))
+                .filter(URLUtils::isMarkedURL)
                 .collect(Collectors.toSet());
     }
 
