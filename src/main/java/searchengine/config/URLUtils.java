@@ -1,7 +1,6 @@
 package searchengine.config;
 
 import lombok.NoArgsConstructor;
-import lombok.Synchronized;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -11,26 +10,18 @@ import org.springframework.stereotype.Component;
 public class URLUtils {
 
     public static synchronized boolean filterCorrectLinks(String link) {
-        String result = removeAnchors(link);
-        result = removeEndBackslash(result);
-        return notFile(result);
+        return notFile(link);
     }
     private static synchronized String removeEndBackslash(String link) {
         return getLastChar(link).equalsIgnoreCase("/")
-                ? link.substring(0, link.length() - 1)
-                : link ;
+                ? link.substring(0, link.length() - 1) : link ;
     }
 
     public static synchronized String repairLink(String link) {
-        return removeEndBackslash(link);
-    }
+        if (!link.endsWith("/"))
+            link = link.concat("/");
 
-    public static synchronized boolean isMarkedURL(String link) {
-        return link.startsWith("#");
-    }
-
-    public static synchronized boolean notMarkedURL(String link) {
-        return !isMarkedURL(link);
+        return removeAnchors(link);
     }
 
     private synchronized static String getLastChar(String link) {
@@ -41,9 +32,10 @@ public class URLUtils {
         String regexp = getRegExp(link);
         link = repairLink(link);
 
-        int fromIndex = link.indexOf(regexp) + regexp.length();
+        int beginIndex = link.indexOf(regexp) + regexp.length();
+        int endIndex = link.indexOf("/", beginIndex);
 
-        return link.substring(fromIndex);
+        return link.substring(beginIndex, endIndex);
     }
 
     public synchronized static String parseRelURL(String link) {
@@ -57,33 +49,17 @@ public class URLUtils {
         return result.substring(result.indexOf("/"));
     }
 
-    public synchronized static boolean isMainURL(String link) {
-        if (link.startsWith("/") && link.length() > 1)
-            return false;
-
-        link = parseRelURL(link);
-        return link.equalsIgnoreCase("/");
-    }
-
-    public synchronized static boolean notMainURL(String link) {
-        return !isMainURL(link);
-    }
-
     private synchronized static String getRegExp(String link) {
         return link.contains("://www.")
-                ? "://www."
-                : link.contains("://")
-                ? "://"
-                : "/";
+                ? "://www." : link.contains("://") ? "://" : "/";
     }
 
-    public synchronized static boolean isSubLink(String parsedRootURL, String l) {
-        return l.contains(parsedRootURL);
+    public synchronized static boolean isSubLink(String root, String l) {
+        return l.contains(root);
     }
-
 
     private static synchronized boolean notFile(String link) {
-        return !link.matches(".*\\/.*\\.(.)*\\z");
+        return link.matches(".*\\/[^\\.]+\\z");
     }
 
     private static synchronized String removeAnchors(String link) {

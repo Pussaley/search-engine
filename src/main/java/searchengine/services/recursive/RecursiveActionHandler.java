@@ -1,17 +1,17 @@
 package searchengine.services.recursive;
 
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Connection;
 import searchengine.config.SearchEngineApplicationContext;
 import searchengine.config.Site;
 import searchengine.config.URLUtils;
 import searchengine.dto.entity.PageDTO;
-import searchengine.dto.entity.SiteDTO;
 import searchengine.services.CRUDService;
 import searchengine.services.impl.PageServiceImpl;
 import searchengine.services.jsoup.JSOUPParser;
 
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.List;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
@@ -36,11 +36,13 @@ public class RecursiveActionHandler extends RecursiveAction {
         JSOUPParser parser =
                 SearchEngineApplicationContext.getBean(JSOUPParser.class);
 
+        List<RecursiveActionHandler> tasks = new ArrayList<>();
+
         Collection<String> foundURLs = parser.parseAbsoluteLinks(urlToParse);
+//        foundURLs.removeIf(parsedURLs::contains);
 
-        foundURLs.removeIf(parsedURLs::contains);
+        if (!foundURLs.isEmpty() && !parsedURLs.contains(urlToParse)) {
 
-        if (!foundURLs.isEmpty()) {
             parsedURLs.add(urlToParse);
 /*
             Connection.Response response = parser.executeRequest(urlToParse);
@@ -53,11 +55,12 @@ public class RecursiveActionHandler extends RecursiveAction {
 
             pageService.save(pageDTO);*/
 
-            log.info("Добавили {}", urlToParse);
+            foundURLs.stream()
+                    .map(RecursiveActionHandler::new)
+                    .forEach(tasks::add);
+
             ForkJoinTask
-                    .invokeAll(foundURLs.stream()
-                            .map(RecursiveActionHandler::new)
-                            .toList())
+                    .invokeAll(tasks)
                     .forEach(ForkJoinTask::join);
         }
     }

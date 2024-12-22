@@ -42,7 +42,8 @@ public class IndexingServiceImpl implements IndexingService {
             }
 
         });
-        log.info("{}", RecursiveActionHandler.parsedURLs);
+        log.info("==========================================================");
+        log.info("parsedURLs: {}", RecursiveActionHandler.parsedURLs);
     }
 
     /**
