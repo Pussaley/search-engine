@@ -2,18 +2,22 @@ package searchengine.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
+import searchengine.config.URLStorage;
+import searchengine.config.URLUtils;
+import searchengine.model.SiteEntity;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 import searchengine.services.IndexingService;
-import searchengine.services.ServiceConnector;
 import searchengine.services.recursive.RecursiveActionHandler;
 
+import java.util.List;
 import java.util.concurrent.ForkJoinPool;
-import java.util.concurrent.RecursiveAction;
 
 @RequiredArgsConstructor
 @Log4j2
@@ -22,17 +26,22 @@ import java.util.concurrent.RecursiveAction;
 public class IndexingServiceImpl implements IndexingService {
 
     private final SitesList sites;
-    private final ServiceConnector serviceConnector;
+    private final SiteServiceImpl siteService;
+    private final URLStorage storage;
+    private final URLUtils utils;
+    private final IndexingServiceImplTEST test;
 
     @Override
     public void startIndexing() {
-        deleteAllOldData();
-        startRecursiveIndexing();
+        //startRecursiveIndexing();
+        test.startIndexing();
     }
 
     private void startRecursiveIndexing() {
+        deleteAllOldData();
         sites.getSites().forEach(site -> {
-            RecursiveAction handler = new RecursiveActionHandler(site);
+            RecursiveActionHandler handler = new RecursiveActionHandler(site);
+            handler.clear();
             try {
                 ForkJoinPool commonPool = ForkJoinPool.commonPool();
                 commonPool.invoke(handler);
@@ -42,8 +51,6 @@ public class IndexingServiceImpl implements IndexingService {
             }
 
         });
-        log.info("==========================================================");
-        log.info("parsedURLs: {}", RecursiveActionHandler.parsedURLs);
     }
 
     /**
@@ -53,11 +60,14 @@ public class IndexingServiceImpl implements IndexingService {
 
         sites.getSites().stream()
                 .map(Site::getUrl)
-                .forEach(siteUrl -> {
-                    serviceConnector.findSiteByUrl(siteUrl).ifPresentOrElse(
-                            serviceConnector::deleteSite,
-                            () -> log.info("No data to delete were found.")
-                    );
-                });
+                .map(URLUtils::repairLink)
+                .forEach(siteUrl ->
+                        siteService.findByUrl(siteUrl).ifPresentOrElse(
+                                siteService::deleteSite,
+                                () -> log.info("No data to delete were found.")
+                        ));
+        log.info("Удалили");
+        List<SiteEntity> list = siteService.findAll();
+        log.info("В таблице после удаления найдено записей: {}", list.size());
     }
 }

@@ -1,5 +1,6 @@
 package searchengine.model;
 
+import jakarta.persistence.ConstraintMode;
 import jakarta.persistence.Index;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -36,7 +37,7 @@ public class Page {
     private String content;
 
     @ManyToOne
-    @JoinColumn(name = "site_id")
+    @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
     @ManyToMany(
             fetch = FetchType.LAZY,

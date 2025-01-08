@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface PageRepository extends JpaRepository<Page, Long> {
     boolean existsByPath(String path);
     Optional<Page> findByPath(String path);
+    void deleteBySiteId(Long siteId);
 }

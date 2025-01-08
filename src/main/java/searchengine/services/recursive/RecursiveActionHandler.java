@@ -1,14 +1,21 @@
 package searchengine.services.recursive;
 
+import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
+import org.jsoup.nodes.Document;
 import searchengine.config.SearchEngineApplicationContext;
 import searchengine.config.Site;
 import searchengine.config.URLUtils;
 import searchengine.dto.entity.PageDTO;
-import searchengine.services.CRUDService;
+import searchengine.dto.entity.SiteDTO;
+import searchengine.model.SiteStatus;
 import searchengine.services.impl.PageServiceImpl;
+import searchengine.services.impl.SiteServiceImpl;
 import searchengine.services.jsoup.JSOUPParser;
 
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
@@ -18,8 +25,15 @@ import java.util.concurrent.RecursiveAction;
 
 @Slf4j
 public class RecursiveActionHandler extends RecursiveAction {
-    public static final Collection<String> parsedURLs = new CopyOnWriteArraySet<>();
+    /* TODO: переписать с использованием класса URLStorage */
+
+    @Getter
+    private static final Collection<String> parsedURLs = new CopyOnWriteArraySet<>();
     private final String urlToParse;
+    private PageServiceImpl pageService =
+            SearchEngineApplicationContext.getBean(PageServiceImpl.class);
+    private SiteServiceImpl siteService =
+            SearchEngineApplicationContext.getBean(SiteServiceImpl.class);
 
     public RecursiveActionHandler(Site site) {
         this(site.getUrl());
@@ -31,30 +45,19 @@ public class RecursiveActionHandler extends RecursiveAction {
 
     @Override
     protected void compute() {
-        CRUDService<PageDTO> pageService =
-                SearchEngineApplicationContext.getBean(PageServiceImpl.class);
         JSOUPParser parser =
                 SearchEngineApplicationContext.getBean(JSOUPParser.class);
 
         List<RecursiveActionHandler> tasks = new ArrayList<>();
 
-        Collection<String> foundURLs = parser.parseAbsoluteLinks(urlToParse);
-//        foundURLs.removeIf(parsedURLs::contains);
+        JSOUPParser.Data data = parser.getData(urlToParse);
+        Collection<String> foundURLs = data.getLinks();
 
         if (!foundURLs.isEmpty() && !parsedURLs.contains(urlToParse)) {
 
-            parsedURLs.add(urlToParse);
-/*
-            Connection.Response response = parser.executeRequest(urlToParse);
+            Connection.Response response = data.getResponse();
 
-            PageDTO pageDTO = new PageDTO();
-            pageDTO.setCode(response.statusCode());
-            pageDTO.setContent(response.body());
-            pageDTO.setPath(parser.parsePath(urlToParse));
-            pageDTO.setSite(new SiteDTO()); // ?
-
-            pageService.save(pageDTO);*/
-
+            savePage(urlToParse, response);
             foundURLs.stream()
                     .map(RecursiveActionHandler::new)
                     .forEach(tasks::add);
@@ -63,5 +66,44 @@ public class RecursiveActionHandler extends RecursiveAction {
                     .invokeAll(tasks)
                     .forEach(ForkJoinTask::join);
         }
+    }
+
+    public void clear() {
+        parsedURLs.clear();
+    }
+
+    public SiteDTO findOrCreateSiteByUrl(String siteUrl) {
+        return siteService.findByUrl(siteUrl)
+                .orElseGet(() -> {
+                    SiteDTO siteDTO = new SiteDTO();
+
+                    siteDTO.setUrl(siteUrl);
+                    siteDTO.setSiteStatus(SiteStatus.INDEXING);
+                    siteDTO.setStatusTime(LocalDateTime.now());
+                    siteDTO.setName(URLUtils.parseRootURL(siteUrl));
+
+                    return siteService.save(siteDTO);
+                });
+    }
+
+    @SneakyThrows
+    private void savePage(String page, Connection.Response response) {
+
+        String url = response.url().getProtocol().concat("://").concat(response.url().getHost());
+        String content = response.body();
+        url = url.endsWith("/") ? url : url.concat("/");
+
+        String relativePage = URLUtils.parseRelURL(page);
+
+        SiteDTO site = findOrCreateSiteByUrl(url);
+
+        PageDTO pageDTO = new PageDTO();
+        pageDTO.setPath(relativePage);
+        pageDTO.setCode(response.statusCode());
+        pageDTO.setContent(content);
+        pageDTO.setSite(site);
+
+        pageService.save(pageDTO);
+        parsedURLs.add(page);
     }
 }

@@ -26,7 +26,8 @@ public class PageServiceImpl implements CRUDService<PageDTO> {
 
     @Override
     public boolean deleteById(Long id) {
-        return false;
+        pageRepository.deleteById(id);
+        return !pageRepository.existsById(id);
     }
 
     public PageDTO save(PageDTO pageDTO) {
@@ -39,7 +40,7 @@ public class PageServiceImpl implements CRUDService<PageDTO> {
                 .map(pageMapper::toDTO);
     }
 
-    public boolean existsByPath(String path) {
-        return pageRepository.existsByPath(path);
+    public void deleteBySiteId(Long siteId) {
+        pageRepository.deleteBySiteId(siteId);
     }
 }

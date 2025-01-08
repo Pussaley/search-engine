@@ -21,7 +21,7 @@ public class URLUtils {
         if (!link.endsWith("/"))
             link = link.concat("/");
 
-        return removeAnchors(link);
+        return remove3w(removeAnchors(link));
     }
 
     private synchronized static String getLastChar(String link) {
@@ -33,7 +33,7 @@ public class URLUtils {
         link = repairLink(link);
 
         int beginIndex = link.indexOf(regexp) + regexp.length();
-        int endIndex = link.indexOf("/", beginIndex);
+        int endIndex = link.indexOf("/", beginIndex) == -1 ? link.length() - 1 : link.indexOf("/", beginIndex);
 
         return link.substring(beginIndex, endIndex);
     }
@@ -64,5 +64,9 @@ public class URLUtils {
 
     private static synchronized String removeAnchors(String link) {
         return link.contains("#") ? link.substring(0, link.indexOf("#")) : link;
+    }
+
+    private static synchronized String remove3w(String link){
+        return link.contains("www.") ? link.replace("www.", "") : link;
     }
 }

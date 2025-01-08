@@ -3,6 +3,8 @@ package searchengine.model;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
+import org.hibernate.annotations.OnDelete;
+import org.hibernate.annotations.OnDeleteAction;
 import org.hibernate.annotations.UpdateTimestamp;
 
 import jakarta.persistence.CascadeType;
@@ -50,6 +52,8 @@ public class SiteEntity {
     private List<Page> pages;
 
     public void clearPages() {
+        if (pages == null)
+            return;
         pages.forEach(page -> page = null);
     }
 }
