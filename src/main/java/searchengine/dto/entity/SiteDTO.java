@@ -1,10 +1,13 @@
 package searchengine.dto.entity;
 
 import lombok.Data;
+import org.springframework.stereotype.Component;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
 
+
+@Component
 @Data
 public class SiteDTO {
     private Long id;
@@ -13,4 +16,8 @@ public class SiteDTO {
     private String lastError;
     private String url;
     private String name;
+
+    public SiteDTO() {
+        setStatusTime(LocalDateTime.now());
+    }
 }

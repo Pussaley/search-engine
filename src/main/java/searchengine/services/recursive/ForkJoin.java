@@ -1,5 +1,6 @@
 package searchengine.services.recursive;
 
+import jakarta.transaction.Transactional;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
@@ -8,7 +9,6 @@ import searchengine.config.SearchEngineApplicationContext;
 import searchengine.dto.entity.PageDTO;
 import searchengine.dto.entity.SiteDTO;
 import searchengine.exceptions.SiteNotCreatedException;
-import searchengine.model.SiteStatus;
 import searchengine.services.impl.PageServiceImpl;
 import searchengine.services.impl.SiteServiceImpl;
 import searchengine.services.jsoup.JSOUPParser;
@@ -22,7 +22,7 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 
 @Slf4j
-public class TestForkJoin extends RecursiveAction {
+public class ForkJoin extends RecursiveAction {
     private final Collection<String> URLs;
     private static final Collection<String> parsedURLs = new CopyOnWriteArraySet<>();
     private final PageServiceImpl pageService =
@@ -30,7 +30,7 @@ public class TestForkJoin extends RecursiveAction {
     private final SiteServiceImpl siteService =
             SearchEngineApplicationContext.getBean(SiteServiceImpl.class);
 
-    public TestForkJoin(Connection.Response response, Collection<String> absoluteURLs) {
+    public ForkJoin(Connection.Response response, Collection<String> absoluteURLs) {
         saveDataToDB(response);
         this.URLs = absoluteURLs;
     }
@@ -48,7 +48,7 @@ public class TestForkJoin extends RecursiveAction {
 
             Connection.Response response = parser.executeRequest(siteURL);
             Collection<String> links = parser.parseAbsoluteLinks(siteURL);
-            tasks.add(new TestForkJoin(response, links));
+            tasks.add(new ForkJoin(response, links));
 
         });
 
@@ -58,8 +58,8 @@ public class TestForkJoin extends RecursiveAction {
     }
 
     @SneakyThrows
-    private void saveDataToDB(Connection.Response response) {
-        /// SOME CODE TO SAVE SITE OR PAGE TO DB
+    @Transactional
+    public void saveDataToDB(Connection.Response response) {
         Document document = response.parse();
         URL url = response.url();
         String path = url.getPath();

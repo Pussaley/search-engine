@@ -2,20 +2,18 @@ package searchengine.services.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.log4j.Log4j2;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.context.annotation.Primary;
+import org.jsoup.Connection;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
-import searchengine.config.URLStorage;
-import searchengine.config.URLUtils;
-import searchengine.model.SiteEntity;
-import searchengine.repository.PageRepository;
-import searchengine.repository.SiteRepository;
+import searchengine.dto.entity.SiteDTO;
+import searchengine.model.SiteStatus;
 import searchengine.services.IndexingService;
-import searchengine.services.recursive.RecursiveActionHandler;
+import searchengine.services.jsoup.JSOUPParser;
+import searchengine.services.recursive.ForkJoin;
 
+import java.util.Collection;
 import java.util.List;
 import java.util.concurrent.ForkJoinPool;
 
@@ -26,48 +24,49 @@ import java.util.concurrent.ForkJoinPool;
 public class IndexingServiceImpl implements IndexingService {
 
     private final SitesList sites;
+    private final JSOUPParser parser;
     private final SiteServiceImpl siteService;
-    private final URLStorage storage;
-    private final URLUtils utils;
-    private final IndexingServiceImplTEST test;
 
     @Override
     public void startIndexing() {
-        //startRecursiveIndexing();
-        test.startIndexing();
+        List<Site> sitesList = sites.getSites();
+
+        startRecursiveIndexing(sitesList);
     }
 
-    private void startRecursiveIndexing() {
-        deleteAllOldData();
-        sites.getSites().forEach(site -> {
-            RecursiveActionHandler handler = new RecursiveActionHandler(site);
-            handler.clear();
-            try {
-                ForkJoinPool commonPool = ForkJoinPool.commonPool();
-                commonPool.invoke(handler);
-            } catch (Exception exception) {
-                log.error("Exception: {}", exception.getMessage());
-                exception.printStackTrace();
-            }
+    public void startRecursiveIndexing(Collection<Site> sites) {
+        sites.forEach(
+                (site) -> {
+                    String siteURL = site.getUrl();
+                    String siteName = site.getName();
 
-        });
+                    deleteSiteFromDBByUrl(siteURL);
+
+                    Connection.Response response = parser.executeRequest(siteURL);
+                    Collection<String> links = parser.parseAbsoluteLinks(siteURL);
+
+                    SiteDTO beforeSaving = new SiteDTO();
+
+                    beforeSaving.setUrl(response.url().toString());
+                    beforeSaving.setSiteStatus(SiteStatus.INDEXING);
+                    beforeSaving.setName(siteName);
+
+                    SiteDTO afterSaving = siteService.save(beforeSaving);
+                    startForkJoinPool(response, links);
+                }
+        );
     }
 
-    /**
-     * This method deleted all the entities from {@link SiteRepository} and {@link PageRepository}.
-     */
-    private void deleteAllOldData() {
+    private void startForkJoinPool(Connection.Response response,
+                                   Collection<String> absoluteURLs) {
+        ForkJoinPool commonPool = ForkJoinPool.commonPool();
+        commonPool.invoke(new ForkJoin(response, absoluteURLs));
+    }
 
-        sites.getSites().stream()
-                .map(Site::getUrl)
-                .map(URLUtils::repairLink)
-                .forEach(siteUrl ->
-                        siteService.findByUrl(siteUrl).ifPresentOrElse(
-                                siteService::deleteSite,
-                                () -> log.info("No data to delete were found.")
-                        ));
-        log.info("Удалили");
-        List<SiteEntity> list = siteService.findAll();
-        log.info("В таблице после удаления найдено записей: {}", list.size());
+    private void deleteSiteFromDBByUrl(String siteUrl) {
+        siteService.findByUrl(siteUrl)
+                .ifPresentOrElse(
+                        siteService::deleteSite,
+                        () -> log.info("No data to delete were found."));
     }
 }
