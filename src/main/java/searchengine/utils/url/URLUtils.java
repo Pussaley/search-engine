@@ -1,4 +1,4 @@
-package searchengine.config;
+package searchengine.utils.url;
 
 import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,7 +12,7 @@ public class URLUtils {
     public static synchronized boolean filterCorrectLinks(String link) {
         return notFile(link);
     }
-    private static synchronized String removeEndBackslash(String link) {
+    public static synchronized String removeEndBackslash(String link) {
         return getLastChar(link).equalsIgnoreCase("/")
                 ? link.substring(0, link.length() - 1) : link ;
     }
@@ -68,5 +68,9 @@ public class URLUtils {
 
     private static synchronized String remove3w(String link){
         return link.contains("www.") ? link.replace("www.", "") : link;
+    }
+
+    public static String shortLink(String link) {
+        return remove3w(link);
     }
 }

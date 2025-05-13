@@ -3,6 +3,7 @@ package searchengine.config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
+import searchengine.utils.url.URLUtils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;

@@ -22,7 +22,7 @@ public class Page {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
-    @Column(name = "path", columnDefinition = "VARCHAR(255)", nullable = false)
+    @Column(name = "path", columnDefinition = "VARCHAR(255)", nullable = false, unique = true)
     private String path;
     @Column(name = "code", nullable = false)
     private Integer code;

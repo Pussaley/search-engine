@@ -1,8 +1,14 @@
 package searchengine.dto.entity;
 
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
 import org.springframework.stereotype.Component;
 
 @Component
+@Data
+@Builder
+@AllArgsConstructor
 public class PageDTO {
     private Long id;
     private String path;
@@ -11,45 +17,5 @@ public class PageDTO {
     private SiteDTO site;
 
     public PageDTO() {
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
-    }
-
-    public Integer getCode() {
-        return code;
-    }
-
-    public void setCode(Integer code) {
-        this.code = code;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public SiteDTO getSite() {
-        return site;
-    }
-
-    public void setSite(SiteDTO site) {
-        this.site = site;
     }
 }

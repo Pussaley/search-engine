@@ -6,7 +6,6 @@ import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
 
-
 @Component
 @Data
 public class SiteDTO {

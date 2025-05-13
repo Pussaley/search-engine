@@ -22,7 +22,7 @@ public class ApiController {
     @GetMapping("/startIndexing")
     public ResponseEntity<?> startIndexing() {
         indexingService.startIndexing();
-        return new ResponseEntity<>(HttpStatus.OK);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/stopIndexing")
