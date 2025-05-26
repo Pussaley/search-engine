@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.dto.entity.PageDTO;
-import searchengine.mappers.PageMapper;
-import searchengine.model.Page;
+import searchengine.model.dto.entity.PageDto;
+import searchengine.mapper.PageMapper;
+import searchengine.model.entity.PageEntity;
 import searchengine.repository.PageRepository;
 
 import java.util.List;
@@ -21,28 +21,28 @@ public class PageDao {
     private final PageMapper pageMapper;
     private final PageRepository pageRepository;
 
-    public Optional<PageDTO> findById(Long id) {
+    public Optional<PageDto> findById(Long id) {
         return pageRepository.findById(id)
                 .map(pageMapper::toDTO);
     }
 
-    public Optional<PageDTO> findByPath(String path) {
+    public Optional<PageDto> findByPath(String path) {
         return pageRepository.findByPath(path)
                 .map(pageMapper::toDTO);
     }
 
-    public List<PageDTO> findBySiteId(Long siteId) {
+    public List<PageDto> findBySiteId(Long siteId) {
         return pageRepository.findAllBySiteId(siteId).stream()
                 .map(pageMapper::toDTO)
                 .collect(Collectors.toList());
     }
 
-    public PageDTO save(PageDTO pageDTO) {
+    public PageDto save(PageDto pageDTO) {
 
         log.info("[{}] Saving the page '{}'", this.getClass().getSimpleName(), pageDTO.getPath());
 
-        Page entity = pageMapper.toEntity(pageDTO);
-        Page savedEntity = pageRepository.saveAndFlush(entity);
+        PageEntity entity = pageMapper.toEntity(pageDTO);
+        PageEntity savedEntity = pageRepository.saveAndFlush(entity);
         return pageMapper.toDTO(savedEntity);
     }
 }

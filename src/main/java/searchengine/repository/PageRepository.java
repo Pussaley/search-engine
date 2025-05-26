@@ -4,16 +4,16 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
-import searchengine.dto.entity.PageDTO;
-import searchengine.model.Page;
+import searchengine.model.entity.PageEntity;
 
 import java.util.List;
 import java.util.Optional;
 
 @Repository
-public interface PageRepository extends JpaRepository<Page, Long> {
-    Optional<Page> findByPath(String path);
-    List<Page> findAllBySiteId(Long siteId);
+public interface PageRepository extends JpaRepository<PageEntity, Long> {
+    Optional<PageEntity> findByPath(String path);
+
+    List<PageEntity> findAllBySiteId(Long siteId);
 
     @Modifying
     @Query(

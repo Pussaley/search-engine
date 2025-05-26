@@ -4,9 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.model.SiteEntity;
+import searchengine.model.entity.SiteEntity;
 import searchengine.repository.SiteRepository;
-import searchengine.services.impl.PageServiceImpl;
+import searchengine.service.impl.PageServiceImpl;
 
 @Component
 @RequiredArgsConstructor
@@ -23,6 +23,7 @@ public class SiteDao {
 
         siteRepository.deleteByName(siteName);
     }
+
     public void clearDatabaseBySiteId(Long id) {
         siteRepository
                 .findById(id)
@@ -30,5 +31,9 @@ public class SiteDao {
                 .ifPresent(pageService::deletePagesBySiteId);
 
         siteRepository.deleteById(id);
+    }
+
+    public SiteEntity save(SiteEntity entity) {
+        return siteRepository.save(entity);
     }
 }
