@@ -1,4 +1,4 @@
 package searchengine.model.dto.response;
 
-public record ResponseSuccessDto(Boolean result) implements Response {
+public record ResponseSuccessDto(boolean result) implements Response {
 }

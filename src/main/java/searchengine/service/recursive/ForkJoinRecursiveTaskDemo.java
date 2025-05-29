@@ -3,7 +3,9 @@ package searchengine.service.recursive;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import searchengine.config.SearchEngineApplicationContext;
+import searchengine.config.Site;
 import searchengine.model.dto.entity.PageDto;
+import searchengine.model.entity.SiteEntity;
 import searchengine.service.impl.PageServiceImpl;
 import searchengine.util.jsoup.JSOUPParser;
 
@@ -17,24 +19,22 @@ import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 
 @Slf4j
-public class ForkJoinRecursiveTask extends RecursiveTask<Boolean> {
-    private final PageServiceImpl pageService =
-            SearchEngineApplicationContext.getBean(PageServiceImpl.class);
+public class ForkJoinRecursiveTaskDemo extends RecursiveTask<Boolean> {
     private final JSOUPParser jsoupParser =
             SearchEngineApplicationContext.getBean(JSOUPParser.class);
+    private final PageServiceImpl pageService =
+            SearchEngineApplicationContext.getBean(PageServiceImpl.class);
     private Connection.Response response;
     private Collection<String> URLs;
-    private ForkJoinTaskStatus taskStatus = ForkJoinTaskStatus.NOT_ACTIVE;
     private static Set<String> parsedURLs = new CopyOnWriteArraySet<>();
 
-    public ForkJoinRecursiveTask(Connection.Response response, Collection<String> links) {
-        this.response = Objects.requireNonNull(response);
-        this.URLs = links;
+    public ForkJoinRecursiveTaskDemo(String siteUrl) {
+        this.response = jsoupParser.execute(siteUrl);
+        this.URLs = jsoupParser.parseAbsoluteLinks(Objects.requireNonNull(response));
     }
 
-    public ForkJoinRecursiveTask(Connection.Response response) {
-        this.response = Objects.requireNonNull(response);
-        this.URLs = jsoupParser.parseAbsoluteLinks(response);
+    public ForkJoinRecursiveTaskDemo(Site site) {
+        this(site.getUrl());
     }
 
     @Override
@@ -46,12 +46,10 @@ public class ForkJoinRecursiveTask extends RecursiveTask<Boolean> {
             parsedURLs.add(siteURL);
 
             response = jsoupParser.execute(siteURL);
-            Collection<String> links = jsoupParser.parseAbsoluteLinks(response);
-
             PageDto createdPageDto = pageService.createSiteEntityFromJsoupResponse(response);
             pageService.save(createdPageDto);
 
-            tasks.add(new ForkJoinRecursiveTask(response, links));
+            tasks.add(new ForkJoinRecursiveTaskDemo(siteURL));
         });
 
         Collection<ForkJoinTask<Boolean>> forkJoinTasks
