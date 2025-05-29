@@ -5,7 +5,6 @@ import org.jsoup.Connection;
 import searchengine.config.SearchEngineApplicationContext;
 import searchengine.config.Site;
 import searchengine.model.dto.entity.PageDto;
-import searchengine.model.entity.SiteEntity;
 import searchengine.service.impl.PageServiceImpl;
 import searchengine.util.jsoup.JSOUPParser;
 
@@ -29,12 +28,20 @@ public class ForkJoinRecursiveTaskDemo extends RecursiveTask<Boolean> {
     private static Set<String> parsedURLs = new CopyOnWriteArraySet<>();
 
     public ForkJoinRecursiveTaskDemo(String siteUrl) {
-        this.response = jsoupParser.execute(siteUrl);
-        this.URLs = jsoupParser.parseAbsoluteLinks(Objects.requireNonNull(response));
+        init(siteUrl);
     }
 
     public ForkJoinRecursiveTaskDemo(Site site) {
-        this(site.getUrl());
+        init(site);
+    }
+
+    private void init(Site site) {
+        init(site.getUrl());
+    }
+
+    private void init(String siteUrl) {
+        this.response = jsoupParser.execute(siteUrl);
+        this.URLs = jsoupParser.parseAbsoluteLinks(Objects.requireNonNull(response));
     }
 
     @Override
@@ -46,7 +53,7 @@ public class ForkJoinRecursiveTaskDemo extends RecursiveTask<Boolean> {
             parsedURLs.add(siteURL);
 
             response = jsoupParser.execute(siteURL);
-            PageDto createdPageDto = pageService.createSiteEntityFromJsoupResponse(response);
+            PageDto createdPageDto = pageService.createDtoFromJsoupResponse(response);
             pageService.save(createdPageDto);
 
             tasks.add(new ForkJoinRecursiveTaskDemo(siteURL));

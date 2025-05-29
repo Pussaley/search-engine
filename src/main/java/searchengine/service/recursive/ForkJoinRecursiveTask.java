@@ -32,10 +32,10 @@ public class ForkJoinRecursiveTask extends RecursiveTask<Boolean> {
         this.URLs = links;
     }
 
-    public ForkJoinRecursiveTask(Connection.Response response) {
-        this.response = Objects.requireNonNull(response);
-        this.URLs = jsoupParser.parseAbsoluteLinks(response);
-    }
+//    public ForkJoinRecursiveTask(Connection.Response response) {
+//        this.response = Objects.requireNonNull(response);
+//        this.URLs = jsoupParser.parseAbsoluteLinks(response);
+//    }
 
     @Override
     protected Boolean compute() {
@@ -48,7 +48,7 @@ public class ForkJoinRecursiveTask extends RecursiveTask<Boolean> {
             response = jsoupParser.execute(siteURL);
             Collection<String> links = jsoupParser.parseAbsoluteLinks(response);
 
-            PageDto createdPageDto = pageService.createSiteEntityFromJsoupResponse(response);
+            PageDto createdPageDto = pageService.createDtoFromJsoupResponse(response);
             pageService.save(createdPageDto);
 
             tasks.add(new ForkJoinRecursiveTask(response, links));

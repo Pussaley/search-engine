@@ -53,7 +53,7 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         pageRepository.flush();
     }
 
-    public PageDto createSiteEntityFromJsoupResponse(Connection.Response response) {
+    public PageDto createDtoFromJsoupResponse(Connection.Response response) {
 
         String siteName = response.url().getHost().split("\\.")[0];
 

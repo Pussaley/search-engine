@@ -12,8 +12,6 @@ import searchengine.model.dto.entity.SiteDto;
 import searchengine.model.dto.response.Response;
 import searchengine.model.dto.response.ResponseSuccessDto;
 import searchengine.service.IndexingService;
-import searchengine.service.impl.indexing.IndexingServiceStarter;
-import searchengine.service.recursive.FJPDemo;
 import searchengine.service.recursive.ForkJoinRecursiveTask;
 import searchengine.service.recursive.ForkJoinRecursiveTaskDemo;
 import searchengine.util.jsoup.JSOUPParser;
@@ -43,45 +41,44 @@ public class DevIndexingServiceImpl implements IndexingService<Response> {
             log.info("isRunning is {}", isRunning.get());
         }
 
-        Thread starter = new Thread(
-                () -> sites.getSites().forEach(
-                        (site) -> {
-                            siteService.clearDatabaseBySiteName(site.getName());
+        new Thread(() -> sites.getSites().forEach(
+                (site) -> {
+                    siteService.clearDatabaseBySiteName(site.getName());
 
-                            SiteDto savedSiteDto = siteService.save(SiteDto
-                                    .builder()
-                                    .url(site.getUrl())
-                                    .name(site.getName())
-                                    .statusTime(LocalDateTime.now())
-                                    .siteStatus(SiteStatus.INDEXING)
-                                    .build());
+                    SiteDto savedSiteDto = siteService.save(SiteDto
+                            .builder()
+                            .url(site.getUrl())
+                            .name(site.getName())
+                            .statusTime(LocalDateTime.now())
+                            .siteStatus(SiteStatus.INDEXING)
+                            .build());
 
-                            log.info("Запущена индексация сайта {}", site.getName());
-/*
-                            ForkJoinRecursiveTaskDemo recursiveTaskDemo = new ForkJoinRecursiveTaskDemo(site);
-                            boolean resultOfIndexing = forkJoinPool.invoke(recursiveTaskDemo);*/
+                    log.info("Запущена индексация сайта {}", site.getName());
 
-                            final JSOUPParser jsoupParser =
+                    ForkJoinRecursiveTaskDemo recursiveTaskDemo = new ForkJoinRecursiveTaskDemo(site);
+                    boolean resultOfIndexing = forkJoinPool.invoke(recursiveTaskDemo);
+
+/*                            final JSOUPParser jsoupParser =
                                     SearchEngineApplicationContext.getBean(JSOUPParser.class);
 
                             Connection.Response response = jsoupParser.execute(site.getUrl());
                             Collection<String> links = jsoupParser.parseAbsoluteLinks(response);
 
                             ForkJoinRecursiveTask recursiveTask = new ForkJoinRecursiveTask(response, links);
-                            boolean resultOfIndexing = forkJoinPool.invoke(recursiveTask);
+                            boolean resultOfIndexing = forkJoinPool.invoke(recursiveTask);*/
 
-                            SiteStatus status = resultOfIndexing ? SiteStatus.INDEXED : SiteStatus.FAILED;
+                    SiteStatus status = resultOfIndexing ? SiteStatus.INDEXED : SiteStatus.FAILED;
 
-                            savedSiteDto.setSiteStatus(status);
-                            siteService.updateSite(savedSiteDto);
-                        }));
+                    savedSiteDto.setSiteStatus(status);
+                    siteService.updateSite(savedSiteDto);
+                })).start();
 
-        starter.start();
         return new ResponseSuccessDto(true);
     }
 
     @Override
     public Response stopIndexing() {
+
         new Thread(() -> {
             if (forkJoinPool != null && isRunning.compareAndSet(true, false)) {
 

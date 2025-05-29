@@ -60,7 +60,7 @@ public class IndexingServiceStarter {
 
                         SiteDto savedDto = siteService.save(siteDTO);
 
-                        ForkJoinRecursiveTask task = new ForkJoinRecursiveTask(response);
+                        ForkJoinRecursiveTask task = new ForkJoinRecursiveTask(response, parser.parseAbsoluteLinks(response));
 //                        ForkJoinRecursiveTaskDemo task = new ForkJoinRecursiveTaskDemo(site);
                         Boolean resultOfRecursiveTask = pool.invoke(task);
 
