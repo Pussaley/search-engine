@@ -13,10 +13,15 @@ import jakarta.persistence.JoinTable;
 import jakarta.persistence.ManyToMany;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 @Entity
+@Data
+@NoArgsConstructor
 @Table(name = "pages", indexes = @Index(name = "page_path_idx", columnList = "path"))
 public class PageEntity {
     @Id
@@ -26,7 +31,7 @@ public class PageEntity {
     private String path;
     @Column(name = "code", nullable = false)
     private Integer code;
-    @Column(name = "content", columnDefinition = "VARCHAR(255)", nullable = false)
+    @Column(name = "content", columnDefinition = "LONGTEXT", nullable = false)
     private String content;
 
     @ManyToOne
@@ -43,56 +48,5 @@ public class PageEntity {
     @JoinTable(name = "indexes",
             joinColumns = @JoinColumn(name = "page_id"),
             inverseJoinColumns = @JoinColumn(name = "lemma_id"))
-    private List<LemmaEntity> lemmas;
-
-    public PageEntity() {
-    }
-
-    public Long getId() {
-        return id;
-    }
-
-    public void setId(Long id) {
-        this.id = id;
-    }
-
-    public String getPath() {
-        return path;
-    }
-
-    public void setPath(String path) {
-        this.path = path;
-    }
-
-    public Integer getCode() {
-        return code;
-    }
-
-    public void setCode(Integer code) {
-        this.code = code;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public void setContent(String content) {
-        this.content = content;
-    }
-
-    public SiteEntity getSite() {
-        return site;
-    }
-
-    public void setSite(SiteEntity site) {
-        this.site = site;
-    }
-
-    public List<LemmaEntity> getLemmas() {
-        return lemmas;
-    }
-
-    public void setLemmas(List<LemmaEntity> lemmas) {
-        this.lemmas = lemmas;
-    }
+    private List<LemmaEntity> lemmas = new CopyOnWriteArrayList<>();;
 }

@@ -18,8 +18,12 @@ import searchengine.util.url.URLUtils;
 
 import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Iterator;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -53,6 +57,15 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
         return siteDTO;
     }
 
+    public List<SiteDto> findNotIndexedSites() {
+        return this.siteRepository.findNotIndexedEntities()
+                .stream()
+                .filter(Optional::isPresent)
+                .map(Optional::get)
+                .map(siteMapper::toDTO)
+                .collect(Collectors.toList());
+    }
+
     public SiteDto save(SiteDto siteDTO) {
 
         SiteEntity result = this.siteRepository
@@ -68,7 +81,21 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
 
     }
 
-    public SiteDto updateSite(SiteDto siteDTO) {
+    public SiteDto updateSite(SiteDto siteDto) {
+        if (siteDto.getId() == null)
+            throw new NullPointerException("The field <id> is empty");
+
+        Optional<SiteEntity> found = this.siteRepository.findById(siteDto.getId());
+        if (found.isPresent()) {
+
+            SiteEntity entity = siteMapper.toEntity(siteDto);
+            return siteMapper.toDTO(siteRepository.save(entity));
+        }
+        return this.save(siteDto);
+    }
+
+    @Deprecated
+    public SiteDto updateSiteDepr(SiteDto siteDTO) {
         SiteDto dto;
         Optional<SiteEntity> foundSiteEntity = siteRepository.findSiteEntitiesByUrlContaining(siteDTO.getUrl());
         if (foundSiteEntity.isPresent()) {
@@ -83,6 +110,53 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
         }
 
         return dto;
+    }
+
+    public void updateNotIndexedEntitiesAfterStoppingIndexing(SiteStatus status, CharSequence message) {
+        log.info("Обновляем статус сущностей");
+        Iterator<SiteDto> it = this.findNotIndexedSites().iterator();
+        while (it.hasNext()) {
+            SiteDto dto = it.next();
+            dto.setSiteStatus(status);
+            dto.setLastError(message.toString());
+            this.updateSite(dto);
+        }
+    }
+
+    public SiteDto save(Site site) {
+
+        SiteDto dto = SiteDto
+                .builder()
+                .url(site.getUrl())
+                .name(site.getName())
+                .statusTime(LocalDateTime.now())
+                .siteStatus(SiteStatus.INDEXING)
+                .build();
+
+        SiteEntity savedEntity = this.siteRepository.save(siteMapper.toEntity(dto));
+
+        return siteMapper.toDTO(savedEntity);
+    }
+
+    public SiteDto createSiteEntityFromJsoupResponse(Connection.Response response) {
+
+        URL responseUrl = response.url();
+        String responseUrlString = response.url().toString();
+        String hostName = responseUrl.getHost();
+
+        int hostLength = hostName.split("\\.").length;
+
+        String url = URLUtils.parseRootURL(URLUtils.removeEndBackslash(responseUrlString));
+        String name = hostLength > 1
+                ? hostName.split("\\.")[hostLength - 2]
+                : hostName;
+
+        return SiteDto.builder()
+                .siteStatus(SiteStatus.INDEXING)
+                .name(name)
+                .url(url)
+                .statusTime(LocalDateTime.now())
+                .build();
     }
 
     @Override
@@ -113,32 +187,5 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
                             pageService.deletePagesBySiteId(siteId);
                             siteRepository.deleteById(id);
                         });
-    }
-
-    public SiteDto createSiteEntityFromJsoupResponse(Connection.Response response) {
-
-        URL responseUrl = response.url();
-        String responseUrlString = response.url().toString();
-        String hostName = responseUrl.getHost();
-
-        int hostLength = hostName.split("\\.").length;
-
-        String url = URLUtils.parseRootURL(URLUtils.removeEndBackslash(responseUrlString));
-        String name = hostLength > 1
-                ? hostName.split("\\.")[hostLength - 2]
-                : hostName;
-
-        return SiteDto.builder()
-                .siteStatus(SiteStatus.INDEXING)
-                .name(name)
-                .url(url)
-                .statusTime(LocalDateTime.now())
-                .build();
-    }
-
-    public void clearSitesTableInDatabase(Collection<Site> sites) {
-        sites.stream()
-                .map(Site::getName)
-                .forEach(this::clearDatabaseBySiteName);
     }
 }

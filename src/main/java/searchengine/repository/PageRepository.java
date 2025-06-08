@@ -15,6 +15,8 @@ public interface PageRepository extends JpaRepository<PageEntity, Long> {
 
     List<PageEntity> findAllBySiteId(Long siteId);
 
+    boolean existsByPath(String path);
+
     @Modifying
     @Query(
             nativeQuery = true,

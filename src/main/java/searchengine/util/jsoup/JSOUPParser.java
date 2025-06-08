@@ -1,70 +1,62 @@
 package searchengine.util.jsoup;
 
 import lombok.RequiredArgsConstructor;
-import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
+import org.jsoup.HttpStatusException;
 import org.jsoup.Jsoup;
+import org.jsoup.UnsupportedMimeTypeException;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Component;
+import searchengine.config.jsoup.Referer;
+import searchengine.config.jsoup.UserAgent;
 import searchengine.config.props.JsoupProperties;
 
 import java.io.IOException;
 import java.net.SocketTimeoutException;
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.stream.Collectors;
 
 @Slf4j
 @RequiredArgsConstructor
 @Component
 public class JSOUPParser {
-
     private final JsoupProperties jsoupProperties;
+    public static final Set<String> incorrectLinks = new CopyOnWriteArraySet<>();
 
-    public Connection.Response execute(String url) {
+    public synchronized Optional<Connection.Response> parse(String url) throws HttpStatusException {
         return executeWithDefaultParams(url);
     }
 
-    public Connection.Response execute(String url, String userAgent, String referer) {
-        return this.execute(url,
-                new UserAgent(userAgent),
-                new Referer(referer),
-                jsoupProperties.getMinTimeOut());
+    private synchronized Optional<Connection.Response> executeWithDefaultParams(String url) throws HttpStatusException {
+
+        String userAgent = jsoupProperties.getUserAgent();
+        String referrer = jsoupProperties.getReferrer();
+        int timeOut = jsoupProperties.getMinTimeOut();
+        Map<String, String> headers = jsoupProperties.headersToMap();
+
+        return parse(url, new UserAgent(userAgent), new Referer(referrer), timeOut, headers);
     }
 
-    public Connection.Response execute(String url, Referer referer) {
-        return this.execute(
-                url,
-                new UserAgent(jsoupProperties.getUserAgent()),
-                referer,
-                jsoupProperties.getMinTimeOut());
-    }
-
-    public Connection.Response execute(String url, String referer) {
-        return this.execute(
-                url,
-                new UserAgent(jsoupProperties.getUserAgent()),
-                new Referer(referer),
-                jsoupProperties.getMinTimeOut());
-    }
-
-    public Connection.Response execute(String url, UserAgent userAgent, Referer referer, int timeOut) {
-        return this.execute(url, userAgent, referer, timeOut, jsoupProperties.headersToMap());
-    }
-
-    public Connection.Response execute(String url,
-                                       UserAgent userAgent,
-                                       Referer referer,
-                                       int timeOut,
-                                       Map<String, String> headers) {
+    private synchronized Optional<Connection.Response> parse(String url,
+                                                             UserAgent userAgent,
+                                                             Referer referer,
+                                                             int timeOut,
+                                                             Map<String, String> headers) throws HttpStatusException {
         Connection.Response response = null;
+
         try {
             response = Jsoup.connect(url)
                     .method(Connection.Method.GET)
-/*                    .ignoreContentType(true)
-                    .followRedirects(true)*/
+                    .followRedirects(true)
                     .userAgent(userAgent.value())
                     .referrer(referer.value())
                     .headers(headers)
@@ -73,54 +65,84 @@ public class JSOUPParser {
         } catch (SocketTimeoutException e) {
             log.error("SocketTimeoutException were thrown while executing the request to {}", url);
             log.error("Error: {}", e.getMessage());
-        } catch (IOException e) {
+            return Optional.empty();
+        } catch (IOException IOE) {
+            if (IOE instanceof HttpStatusException httpStatusException) {
+                throw httpStatusException;
+            }
+            if (IOE instanceof UnsupportedMimeTypeException unsupportedMimeTypeException) {
+                log.error("URL <{}> has incorrect mime-type, its type is: {}",
+                        unsupportedMimeTypeException.getUrl(),
+                        unsupportedMimeTypeException.getMimeType());
+                incorrectLinks.add(url);
+                return Optional.empty();
+            }
             log.error("IOException were thrown while executing the request to {}", url);
-            log.error("Error: {}", e.getMessage());
+            log.error("Error: {}", IOE.getClass());
         }
-
-        return response;
+        return Optional.ofNullable(response);
     }
 
-    private Connection.Response executeWithDefaultParams(String url) {
-
-        String userAgent = jsoupProperties.getUserAgent();
-        String referrer = jsoupProperties.getReferrer();
-        int timeOut = jsoupProperties.getMinTimeOut();
-        Map<String, String> headers = jsoupProperties.headersToMap();
-
-        return execute(url, new UserAgent(userAgent), new Referer(referrer), timeOut, headers);
-    }
-
-    public Collection<String> parseAbsoluteLinks(String url) {
-        Connection.Response response = executeWithDefaultParams(url);
-        return parseAbsoluteLinks(response);
-    }
-
-    @SneakyThrows
-    public Collection<String> parseAbsoluteLinks(Connection.Response response) {
-
-        if (response == null) {
+    public synchronized Collection<String> parsePagesAsAbsURLs(String url) {
+        String rootHost;
+        Connection.Response response = null;
+        try {
+            rootHost = new URI(url).getHost();
+            Optional<Connection.Response> optionalResponse = executeWithDefaultParams(url);
+            if (optionalResponse.isPresent()) {
+                response = optionalResponse.get();
+            }
+        } catch (HttpStatusException httpStatusException) {
+            log.info("Нет доступа к странице <{}>, статус = '{}'", url, httpStatusException.getStatusCode());
+            return Collections.emptyList();
+        } catch (URISyntaxException e) {
+            log.info("При парсинге ссылки <{}> возникла исключительная ситуация.\n\t\t\t\tПроверьте корректность ", url);
+            incorrectLinks.add(url);
             return Collections.emptyList();
         }
 
-        Document document = response.parse();
-        String baseUri = document.baseUri();
+        if (response == null) {
+            log.info("Response is <null>, возвращаю пустой список");
+            return Collections.emptyList();
+        }
 
-        var selectedElements
-                = document.select("a[href^=/], a[href^=http], a[href$=.html]")
-                .stream()
-                .distinct()
-                .toList();
+        Document document;
+        try {
+            document = response.parse();
+        } catch (IOException e) {
+            log.error("При попытке парсинга возникла исключительная ситуация: {}", e.getMessage());
+            log.error("Class искючительной ситуации: {}", e.getClass());
+            return Collections.emptyList();
+        }
 
-        String formats = "png|jpg|jpeg|gif|webp|bmp|svg|ico|mp4|webm|ogg|ogv|oga|mp3|wav|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|zip|rar|7z|tgz|js|css|xml|json|woff|woff2|ttf|otf|apk|exe|bin";
-        StringBuilder cssSelector = new StringBuilder("a:not([href~=(\\#|tel)|(?i)\\.(")
+        String formats = "eps|sql|png|jpg|jpeg|gif|webp|bmp|svg|ico|mp4|webm|ogg|ogv|oga|mp3|wav|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|zip|rar|7z|tgz|js|css|xml|json|woff|woff2|ttf|otf|apk|exe|bin";
+        StringBuilder cssSelector = new StringBuilder("a:not([href~=(#|tel)|(?i)\\.(")
                 .append(formats)
                 .append(")])");
 
+        log.trace("Парсинг сайта: {}", url);
 
-        return document.select(cssSelector.toString()).stream()
-                .map(element -> element.attr("abs:href"))
-                .filter((uri) -> uri.contains(baseUri))
-                .collect(Collectors.toSet());
+        /*TODO исправить причину ошибки в Stream'е: тэг без аттрибута
+         * <a> куда сходить в Москве</a>
+         * <a>бесплатно</a>
+         * <a>Москва</a>
+         * */
+
+        Set<String> set = document.select(cssSelector.toString()).stream()
+                .map(e -> e.attr("abs:href"))
+                .filter(e -> !e.isBlank())
+                .filter((elem) -> {
+                    try {
+                        URI uri = new URI(elem);
+                        String host = uri.getHost();
+                        return !uri.isOpaque() && host.equalsIgnoreCase(rootHost);
+                    } catch (Exception ex) {
+                        incorrectLinks.add(elem);
+                        log.error("Ошибка при парсинге хоста сайта <{}>. Ошибка {}", elem, ex.getClass());
+                        return false;
+                    }
+                }).collect(Collectors.toSet());
+
+        return set;
     }
 }

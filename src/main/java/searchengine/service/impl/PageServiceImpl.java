@@ -3,15 +3,17 @@ package searchengine.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
+import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import searchengine.mapper.PageMapper;
 import searchengine.model.dto.entity.PageDto;
 import searchengine.model.dto.entity.SiteDto;
-import searchengine.mapper.PageMapper;
 import searchengine.model.entity.PageEntity;
 import searchengine.repository.PageRepository;
 import searchengine.service.CRUDService;
 
+import java.io.IOException;
 import java.util.Optional;
 
 @Service
@@ -30,6 +32,11 @@ public class PageServiceImpl implements CRUDService<PageDto> {
                 .map(pageMapper::toDTO);
     }
 
+    public Optional<PageDto> findByPath(String path) {
+        return pageRepository.findByPath(path)
+                .map(pageMapper::toDTO);
+    }
+
     @Override
     public boolean deleteById(Long id) {
         pageRepository.deleteById(id);
@@ -37,14 +44,7 @@ public class PageServiceImpl implements CRUDService<PageDto> {
     }
 
     public PageDto save(PageDto pageDTO) {
-
-        Optional<PageEntity> optional = pageRepository.findByPath(pageDTO.getPath());
-        if (optional.isPresent()) {
-            log.info("{} is already saved in the database", optional.get().getPath());
-            return pageDTO;
-        }
         PageEntity saved = pageRepository.save(pageMapper.toEntity(pageDTO));
-
         return pageMapper.toDTO(saved);
     }
 
@@ -53,19 +53,19 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         pageRepository.flush();
     }
 
-    public PageDto createDtoFromJsoupResponse(Connection.Response response) {
+    public PageDto createDtoFromJsoupResponse(Connection.Response response) throws IOException {
 
-        String siteName = response.url().getHost().split("\\.")[0];
+        Document document;
+        document = response.parse();
 
-        SiteDto siteDTO = siteService.findByNameContaining(siteName)
-                .orElseGet(
-                        () -> {
-                            SiteDto savedSite = siteService.createSiteEntityFromJsoupResponse(response);
+        String baseUri = response.url().getHost().replace("www.", "").split("\\.")[0];
 
-                            log.info("PageServiceImpl | Url: {}", savedSite.getUrl());
-                            return siteService.save(savedSite);
-                        }
-                );
+        SiteDto siteDTO = siteService.findByNameContaining(baseUri).orElseGet(
+                () -> {
+                    SiteDto site = siteService.createSiteEntityFromJsoupResponse(response);
+                    return siteService.save(site);
+                }
+        );
 
         return PageDto.builder()
                 .code(response.statusCode())

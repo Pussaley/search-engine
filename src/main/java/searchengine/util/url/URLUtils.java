@@ -30,8 +30,8 @@ public class URLUtils {
     }
 
     public static synchronized String parseRootURL(String link) {
-        String regexp = getRegExp(link);
         link = repairLink(link);
+        String regexp = getRegExp(link);
 
         int beginIndex = link.indexOf(regexp) + regexp.length();
         int endIndex = link.indexOf("/", beginIndex) == -1 ? link.length() - 1 : link.indexOf("/", beginIndex);

@@ -11,8 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Data;
-import org.hibernate.annotations.SourceType;
-import org.hibernate.annotations.UpdateTimestamp;
+import lombok.NoArgsConstructor;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
@@ -21,6 +20,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 
 @Entity
 @Data
+@NoArgsConstructor
 @Table(name = "sites")
 public class SiteEntity {
 
@@ -30,7 +30,6 @@ public class SiteEntity {
     @Column(name = "status", columnDefinition = "ENUM ('INDEXING', 'INDEXED', 'FAILED')", nullable = false)
     @Enumerated(value = EnumType.STRING)
     private SiteStatus siteStatus;
-    @UpdateTimestamp(source = SourceType.DB)
     @Column(name = "status_time", nullable = false)
     private LocalDateTime statusTime;
     @Column(name = "last_error", columnDefinition = "VARCHAR(255)")
@@ -42,7 +41,6 @@ public class SiteEntity {
 
     @OneToMany(
             cascade = CascadeType.ALL,
-            mappedBy = "site",
-            orphanRemoval = true)
+            mappedBy = "site")
     private List<PageEntity> pages = new CopyOnWriteArrayList<>();
 }
