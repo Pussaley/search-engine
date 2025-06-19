@@ -16,13 +16,17 @@ import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.Map;
 import java.util.Objects;
-import java.util.Optional;
+import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -31,12 +35,15 @@ import java.util.stream.Collectors;
 public class JSOUPParser {
     private final JsoupProperties jsoupProperties;
     public static final Set<String> incorrectLinks = new CopyOnWriteArraySet<>();
+    private static final Random rand = new Random();
 
-    public synchronized Optional<Connection.Response> parse(String url) throws HttpStatusException {
+    public synchronized Connection.Response parse(String url)
+            throws HttpStatusException, UnsupportedMimeTypeException, SocketTimeoutException {
         return executeWithDefaultParams(url);
     }
 
-    private synchronized Optional<Connection.Response> executeWithDefaultParams(String url) throws HttpStatusException {
+    private Connection.Response executeWithDefaultParams(String url)
+            throws HttpStatusException, UnsupportedMimeTypeException {
 
         String userAgent = jsoupProperties.getUserAgent();
         String referrer = jsoupProperties.getReferrer();
@@ -46,26 +53,32 @@ public class JSOUPParser {
         return parse(url, new UserAgent(userAgent), new Referer(referrer), timeOut, headers);
     }
 
-    private synchronized Optional<Connection.Response> parse(String url,
-                                                             UserAgent userAgent,
-                                                             Referer referer,
-                                                             int timeOut,
-                                                             Map<String, String> headers) throws HttpStatusException {
+    private Connection.Response parse(String url,
+                                      UserAgent userAgent,
+                                      Referer referer,
+                                      int timeOut,
+                                      Map<String, String> headers)
+            throws HttpStatusException, UnsupportedMimeTypeException {
+
         Connection.Response response = null;
 
         try {
+//            TimeUnit.MILLISECONDS.sleep(rand.nextInt(timeOut));
+            TimeUnit.MILLISECONDS.sleep(150);
+
             response = Jsoup.connect(url)
                     .method(Connection.Method.GET)
                     .followRedirects(true)
                     .userAgent(userAgent.value())
                     .referrer(referer.value())
                     .headers(headers)
-                    .timeout(timeOut)
+                    //.timeout(timeOut)
                     .execute();
-        } catch (SocketTimeoutException e) {
+        } catch (InterruptedException e) {
+            log.info("Sleep interrupted");
+        } catch (SocketTimeoutException socketTimeoutException) {
             log.error("SocketTimeoutException were thrown while executing the request to {}", url);
-            log.error("Error: {}", e.getMessage());
-            return Optional.empty();
+            log.error("Error: {}", socketTimeoutException.getMessage());
         } catch (IOException IOE) {
             if (IOE instanceof HttpStatusException httpStatusException) {
                 throw httpStatusException;
@@ -75,74 +88,61 @@ public class JSOUPParser {
                         unsupportedMimeTypeException.getUrl(),
                         unsupportedMimeTypeException.getMimeType());
                 incorrectLinks.add(url);
-                return Optional.empty();
+                throw unsupportedMimeTypeException;
             }
             log.error("IOException were thrown while executing the request to {}", url);
             log.error("Error: {}", IOE.getClass());
         }
-        return Optional.ofNullable(response);
+        return response;
     }
 
-    public synchronized Collection<String> parsePagesAsAbsURLs(String url) {
-        String rootHost;
-        Connection.Response response = null;
-        try {
-            rootHost = new URI(url).getHost();
-            Optional<Connection.Response> optionalResponse = executeWithDefaultParams(url);
-            if (optionalResponse.isPresent()) {
-                response = optionalResponse.get();
-            }
-        } catch (HttpStatusException httpStatusException) {
-            log.info("Нет доступа к странице <{}>, статус = '{}'", url, httpStatusException.getStatusCode());
-            return Collections.emptyList();
-        } catch (URISyntaxException e) {
-            log.info("При парсинге ссылки <{}> возникла исключительная ситуация.\n\t\t\t\tПроверьте корректность ", url);
-            incorrectLinks.add(url);
-            return Collections.emptyList();
-        }
-
-        if (response == null) {
-            log.info("Response is <null>, возвращаю пустой список");
-            return Collections.emptyList();
-        }
-
+    public Collection<String> parseAbsLinks(String url) throws HttpStatusException, SocketTimeoutException, UnsupportedMimeTypeException {
+        Connection.Response response;
         Document document;
+        String host;
+        response = executeWithDefaultParams(url);
+        host = response.url().getHost();
         try {
             document = response.parse();
         } catch (IOException e) {
-            log.error("При попытке парсинга возникла исключительная ситуация: {}", e.getMessage());
-            log.error("Class искючительной ситуации: {}", e.getClass());
+            log.error("caught IOException in parseAbsLinks type of: {} ", e.getClass().getSimpleName());
             return Collections.emptyList();
         }
 
-        String formats = "eps|sql|png|jpg|jpeg|gif|webp|bmp|svg|ico|mp4|webm|ogg|ogv|oga|mp3|wav|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|zip|rar|7z|tgz|js|css|xml|json|woff|woff2|ttf|otf|apk|exe|bin";
-        StringBuilder cssSelector = new StringBuilder("a:not([href~=(#|tel)|(?i)\\.(")
-                .append(formats)
-                .append(")])");
+        return parseAbsLinks(document, host);
+    }
 
-        log.trace("Парсинг сайта: {}", url);
+    public Collection<String> parseAbsLinks(Document document, String rootSite) {
 
-        /*TODO исправить причину ошибки в Stream'е: тэг без аттрибута
-         * <a> куда сходить в Москве</a>
-         * <a>бесплатно</a>
-         * <a>Москва</a>
-         * */
+        String formats = "eps|ws|sql|png|jpg|jpeg|gif|webp|bmp|svg|ico|mp4|webm|ogg|ogv|oga|mp3|wav|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|zip|rar|7z|tgz|js|css|xml|json|woff|woff2|ttf|otf|apk|exe|bin";
+        String cssSelector = "a:not([href~=(#|tel|mailto)|(?i)\\.(".concat(formats).concat(")])");
 
-        Set<String> set = document.select(cssSelector.toString()).stream()
+        return document.select(cssSelector).stream()
                 .map(e -> e.attr("abs:href"))
                 .filter(e -> !e.isBlank())
+                .filter(e -> !incorrectLinks.contains(e))
                 .filter((elem) -> {
                     try {
                         URI uri = new URI(elem);
-                        String host = uri.getHost();
-                        return !uri.isOpaque() && host.equalsIgnoreCase(rootHost);
-                    } catch (Exception ex) {
-                        incorrectLinks.add(elem);
-                        log.error("Ошибка при парсинге хоста сайта <{}>. Ошибка {}", elem, ex.getClass());
-                        return false;
+                        return !uri.isOpaque() && uri.getHost().equalsIgnoreCase(rootSite);
+                    } catch (URISyntaxException uriSyntaxException) {
+                        int index = uriSyntaxException.getIndex();
+                        String baseUrl = elem.substring(0, index);
+                        String toEncode = elem.substring(index);
+                        String encoded = URLEncoder.encode(toEncode, StandardCharsets.UTF_8)
+                                .replace("+", "%20")
+                                .replace("%2F", "/");
+                        String fixedUrl = baseUrl + encoded;
+                        try {
+                            URI uri = new URI(fixedUrl);
+                            return !uri.isOpaque() && uri.getHost().equalsIgnoreCase(rootSite);
+                        } catch (URISyntaxException e) {
+                            log.error("Невозможно преобразовать адрес {} в URI [ex: {}]", elem, uriSyntaxException.getClass().getSimpleName());
+                            incorrectLinks.add(elem);
+                            return false;
+                        }
                     }
-                }).collect(Collectors.toSet());
-
-        return set;
+                })
+                .collect(Collectors.toSet());
     }
 }

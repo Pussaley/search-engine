@@ -1,4 +1,4 @@
-package searchengine.service.recursive.demo;
+package searchengine.service.recursive;
 
 import lombok.Getter;
 import searchengine.model.SiteStatus;

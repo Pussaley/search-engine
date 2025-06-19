@@ -14,12 +14,9 @@ import searchengine.model.dto.entity.SiteDto;
 import searchengine.model.entity.SiteEntity;
 import searchengine.repository.SiteRepository;
 import searchengine.service.CRUDService;
-import searchengine.util.url.URLUtils;
 
 import java.net.URL;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Optional;
@@ -49,12 +46,16 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
                 .map(siteMapper::toDTO);
     }
 
-    public Optional<SiteDto> findByNameContaining(String name) {
-        Optional<SiteDto> siteDTO = this.siteRepository
-                .findSiteEntitiesByNameContaining(name)
+    public Optional<SiteDto> findByUrl(String url) {
+        return this.siteRepository
+                .findByUrl(url)
                 .map(siteMapper::toDTO);
+    }
 
-        return siteDTO;
+    public Optional<SiteDto> findByName(String name) {
+        return this.siteRepository
+                .findByName(name)
+                .map(siteMapper::toDTO);
     }
 
     public List<SiteDto> findNotIndexedSites() {
@@ -125,8 +126,7 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
 
     public SiteDto save(Site site) {
 
-        SiteDto dto = SiteDto
-                .builder()
+        SiteDto dto = SiteDto.builder()
                 .url(site.getUrl())
                 .name(site.getName())
                 .statusTime(LocalDateTime.now())
@@ -141,20 +141,14 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
     public SiteDto createSiteEntityFromJsoupResponse(Connection.Response response) {
 
         URL responseUrl = response.url();
-        String responseUrlString = response.url().toString();
-        String hostName = responseUrl.getHost();
 
-        int hostLength = hostName.split("\\.").length;
-
-        String url = URLUtils.parseRootURL(URLUtils.removeEndBackslash(responseUrlString));
-        String name = hostLength > 1
-                ? hostName.split("\\.")[hostLength - 2]
-                : hostName;
+        String siteName = responseUrl.getHost();
+        String siteUrl = responseUrl.getProtocol().concat("://").concat(responseUrl.getHost());
 
         return SiteDto.builder()
                 .siteStatus(SiteStatus.INDEXING)
-                .name(name)
-                .url(url)
+                .name(siteName)
+                .url(siteUrl)
                 .statusTime(LocalDateTime.now())
                 .build();
     }
@@ -175,17 +169,6 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
                         (siteId) -> {
                             pageService.deletePagesBySiteId(siteId);
                             siteRepository.deleteByName(siteName);
-                        });
-    }
-
-    public void clearDatabaseBySiteId(Long id) {
-        siteRepository
-                .findById(id)
-                .map(SiteEntity::getId)
-                .ifPresent(
-                        (siteId) -> {
-                            pageService.deletePagesBySiteId(siteId);
-                            siteRepository.deleteById(id);
                         });
     }
 }

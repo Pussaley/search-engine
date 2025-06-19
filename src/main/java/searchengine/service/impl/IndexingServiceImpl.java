@@ -13,7 +13,7 @@ import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
 import searchengine.model.dto.response.demo.ResponseSuccessMessageDto;
 import searchengine.service.IndexingService;
 import searchengine.service.recursive.ForkJoinRecursiveTask;
-import searchengine.service.recursive.demo.JsoupSiteIndexingResponse;
+import searchengine.service.recursive.JsoupSiteIndexingResponse;
 
 import java.time.LocalDateTime;
 import java.util.List;

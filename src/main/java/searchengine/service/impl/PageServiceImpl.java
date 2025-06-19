@@ -6,6 +6,7 @@ import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import searchengine.exception.SiteNotFoundException;
 import searchengine.mapper.PageMapper;
 import searchengine.model.dto.entity.PageDto;
 import searchengine.model.dto.entity.SiteDto;
@@ -14,6 +15,7 @@ import searchengine.repository.PageRepository;
 import searchengine.service.CRUDService;
 
 import java.io.IOException;
+import java.net.URL;
 import java.util.Optional;
 
 @Service
@@ -53,25 +55,33 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         pageRepository.flush();
     }
 
-    public PageDto createDtoFromJsoupResponse(Connection.Response response) throws IOException {
+    public PageDto createDtoFromJsoupResponse(Connection.Response response) throws IOException, SiteNotFoundException {
 
-        Document document;
-        document = response.parse();
+        URL responseUrl = response.url();
 
-        String baseUri = response.url().getHost().replace("www.", "").split("\\.")[0];
+        String siteName = responseUrl.getHost();
+        String sitePath = responseUrl.getPath();
+        int statusCode = response.statusCode();
 
-        SiteDto siteDTO = siteService.findByNameContaining(baseUri).orElseGet(
-                () -> {
-                    SiteDto site = siteService.createSiteEntityFromJsoupResponse(response);
-                    return siteService.save(site);
-                }
-        );
+        SiteDto siteDto = siteService.findByUrlContaining(siteName)
+                .orElseThrow(() -> {
+                    String site = responseUrl.getProtocol().concat("://").concat(responseUrl.getHost());
+                    return new SiteNotFoundException(site);
+                });
+
+        Document document = response.parse();
+        String content = document.html();
 
         return PageDto.builder()
-                .code(response.statusCode())
-                .path(response.url().getPath())
-                .site(siteDTO)
-                .content("content")
+                .site(siteDto)
+                .content(content)
+                .path(sitePath)
+                .code(statusCode)
                 .build();
+    }
+
+    public Optional<PageDto> findByPathAndSiteUrl(String pagePath, String siteUrl) {
+        return this.pageRepository.findByPathAndSiteUrl(pagePath, siteUrl)
+                .map(pageMapper::toDTO);
     }
 }
