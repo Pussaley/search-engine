@@ -1,4 +1,4 @@
-package searchengine.config.jsoup;
+package searchengine.config.props.jsoup;
 
 import java.util.Objects;
 

@@ -1,6 +1,8 @@
 package searchengine.model.entity;
 
 import jakarta.persistence.CascadeType;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
@@ -29,16 +31,12 @@ public class LemmaEntity {
     private String lemma;
     @Column(name = "frequency", nullable = false)
     private Integer frequency;
-
+    @ManyToOne
+    @JoinColumn(name = "site_id", nullable = false)
+    private SiteEntity site;
     @ManyToMany(
             fetch = FetchType.LAZY,
             mappedBy = "lemmas",
-            cascade = {
-                    CascadeType.DETACH,
-                    CascadeType.MERGE,
-                    CascadeType.PERSIST,
-                    CascadeType.MERGE,
-                    CascadeType.REFRESH
-            })
+            cascade = CascadeType.ALL)
     private List<PageEntity> pages;
 }

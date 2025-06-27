@@ -8,5 +8,5 @@ import searchengine.model.entity.PageEntity;
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)
 public interface PageMapper {
     PageEntity toEntity(PageDto pageDTO);
-    PageDto toDTO(PageEntity page);
+    PageDto toDto(PageEntity page);
 }

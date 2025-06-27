@@ -9,12 +9,18 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.OneToMany;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.hibernate.annotations.DynamicUpdate;
+import org.hibernate.annotations.UpdateTimestamp;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
 
@@ -22,6 +28,7 @@ import java.util.concurrent.CopyOnWriteArrayList;
 @Data
 @NoArgsConstructor
 @Table(name = "sites")
+@Slf4j
 public class SiteEntity {
 
     @Id
@@ -31,6 +38,7 @@ public class SiteEntity {
     @Enumerated(value = EnumType.STRING)
     private SiteStatus siteStatus;
     @Column(name = "status_time", nullable = false)
+    @UpdateTimestamp
     private LocalDateTime statusTime;
     @Column(name = "last_error", columnDefinition = "VARCHAR(255)")
     private String lastError;
@@ -42,5 +50,5 @@ public class SiteEntity {
     @OneToMany(
             cascade = CascadeType.ALL,
             mappedBy = "site")
-    private List<PageEntity> pages = new CopyOnWriteArrayList<>();
+    private List<PageEntity> pages = new ArrayList<>();
 }

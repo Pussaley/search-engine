@@ -33,6 +33,8 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
     @Lazy
     @Autowired
     private PageServiceImpl pageService;
+    private final LemmaServiceImpl lemmaService;
+    private final IndexServiceImpl indexService;
 
     @Override
     public Optional<SiteDto> findById(Long id) {
@@ -125,17 +127,7 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
     }
 
     public SiteDto save(Site site) {
-
-        SiteDto dto = SiteDto.builder()
-                .url(site.getUrl())
-                .name(site.getName())
-                .statusTime(LocalDateTime.now())
-                .siteStatus(SiteStatus.INDEXING)
-                .build();
-
-        SiteEntity savedEntity = this.siteRepository.save(siteMapper.toEntity(dto));
-
-        return siteMapper.toDTO(savedEntity);
+        return save(SiteDto.builder().url(site.getUrl()).name(site.getName()).statusTime(LocalDateTime.now()).siteStatus(SiteStatus.INDEXING).build());
     }
 
     public SiteDto createSiteEntityFromJsoupResponse(Connection.Response response) {
@@ -167,8 +159,14 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
                 .findFirst()
                 .ifPresent(
                         (siteId) -> {
+                            siteRepository.deleteById(siteId);
+                            lemmaService.deleteLemmasBySiteId(siteId);
+                            indexService.deleteIndexesBySiteId(siteId);
                             pageService.deletePagesBySiteId(siteId);
-                            siteRepository.deleteByName(siteName);
                         });
+    }
+
+    public void updateStatusTimeById(Long id) {
+        siteRepository.updateStatusTimeById(LocalDateTime.now(), id);
     }
 }

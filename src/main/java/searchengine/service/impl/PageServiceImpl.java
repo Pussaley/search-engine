@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.exception.SiteNotFoundException;
@@ -16,6 +18,7 @@ import searchengine.service.CRUDService;
 
 import java.io.IOException;
 import java.net.URL;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -26,17 +29,17 @@ public class PageServiceImpl implements CRUDService<PageDto> {
 
     private final PageRepository pageRepository;
     private final PageMapper pageMapper;
-    private final SiteServiceImpl siteService;
+    @Lazy
+    @Autowired
+    private SiteServiceImpl siteService;
 
     @Override
     public Optional<PageDto> findById(Long id) {
-        return pageRepository.findById(id)
-                .map(pageMapper::toDTO);
+        return pageRepository.findById(id).map(pageMapper::toDto);
     }
 
-    public Optional<PageDto> findByPath(String path) {
-        return pageRepository.findByPath(path)
-                .map(pageMapper::toDTO);
+    public synchronized Optional<PageDto> findByPath(String path) {
+        return pageRepository.findByPath(path).map(pageMapper::toDto);
     }
 
     @Override
@@ -45,9 +48,13 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         return !pageRepository.existsById(id);
     }
 
-    public PageDto save(PageDto pageDTO) {
-        PageEntity saved = pageRepository.save(pageMapper.toEntity(pageDTO));
-        return pageMapper.toDTO(saved);
+    public synchronized PageDto save(PageDto pageDTO) {
+        return findByPath(pageDTO.getPath()).orElseGet(() -> {
+            PageEntity entity = pageMapper.toEntity(pageDTO);
+            PageEntity saved = pageRepository.save(entity);
+            pageRepository.flush();
+            return pageMapper.toDto(saved);
+        });
     }
 
     public void deletePagesBySiteId(Long id) {
@@ -63,11 +70,12 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         String sitePath = responseUrl.getPath();
         int statusCode = response.statusCode();
 
-        SiteDto siteDto = siteService.findByUrlContaining(siteName)
-                .orElseThrow(() -> {
-                    String site = responseUrl.getProtocol().concat("://").concat(responseUrl.getHost());
-                    return new SiteNotFoundException(site);
-                });
+        String pageRawPath = responseUrl.getPath().concat(Objects.isNull(responseUrl.getQuery()) ? "" : responseUrl.toString().split(responseUrl.getPath())[1]);
+
+        SiteDto siteDto = siteService.findByUrlContaining(siteName).orElseThrow(() -> {
+            String site = responseUrl.getProtocol().concat("://").concat(responseUrl.getHost());
+            return new SiteNotFoundException(site);
+        });
 
         Document document = response.parse();
         String content = document.html();
@@ -75,13 +83,16 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         return PageDto.builder()
                 .site(siteDto)
                 .content(content)
-                .path(sitePath)
+                .path(pageRawPath)
                 .code(statusCode)
                 .build();
     }
 
     public Optional<PageDto> findByPathAndSiteUrl(String pagePath, String siteUrl) {
-        return this.pageRepository.findByPathAndSiteUrl(pagePath, siteUrl)
-                .map(pageMapper::toDTO);
+        return this.pageRepository.findByPathAndSiteUrl(pagePath, siteUrl).map(pageMapper::toDto);
+    }
+
+    public Integer getCount() {
+        return pageRepository.getCount();
     }
 }

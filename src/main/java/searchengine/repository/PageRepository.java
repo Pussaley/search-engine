@@ -24,4 +24,7 @@ public interface PageRepository extends JpaRepository<PageEntity, Long> {
             value = "select * from pages as p where p.path = ? and p.site_id = (select s.id from sites as s where s.url = ?);"
     )
     Optional<PageEntity> findByPathAndSiteUrl(String path, String siteUrl);
+
+    @Query(nativeQuery = true, value = "select count(*) from pages")
+    Integer getCount();
 }

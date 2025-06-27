@@ -23,17 +23,17 @@ public class PageDao {
 
     public Optional<PageDto> findById(Long id) {
         return pageRepository.findById(id)
-                .map(pageMapper::toDTO);
+                .map(pageMapper::toDto);
     }
 
     public Optional<PageDto> findByPath(String path) {
         return pageRepository.findByPath(path)
-                .map(pageMapper::toDTO);
+                .map(pageMapper::toDto);
     }
 
     public List<PageDto> findBySiteId(Long siteId) {
         return pageRepository.findAllBySiteId(siteId).stream()
-                .map(pageMapper::toDTO)
+                .map(pageMapper::toDto)
                 .collect(Collectors.toList());
     }
 
@@ -43,6 +43,6 @@ public class PageDao {
 
         PageEntity entity = pageMapper.toEntity(pageDTO);
         PageEntity savedEntity = pageRepository.saveAndFlush(entity);
-        return pageMapper.toDTO(savedEntity);
+        return pageMapper.toDto(savedEntity);
     }
 }

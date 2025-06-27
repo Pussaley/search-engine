@@ -1,13 +1,14 @@
-package searchengine.config.props;
+package searchengine.config.props.jsoup;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import searchengine.config.props.jsoup.JsoupHeader;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-@ConfigurationProperties(prefix = "app.search-engine")
+@ConfigurationProperties(prefix = "app.search-engine.jsoup")
 @Data
 public class JsoupProperties {
     private String userAgent;

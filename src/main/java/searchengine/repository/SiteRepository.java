@@ -6,6 +6,8 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import searchengine.model.entity.SiteEntity;
 
+import java.sql.Timestamp;
+import java.time.temporal.Temporal;
 import java.util.List;
 import java.util.Optional;
 
@@ -45,4 +47,11 @@ public interface SiteRepository extends JpaRepository<SiteEntity, Long> {
             value = "select * from sites as s where s.status != 'INDEXED' and last_error is NULL"
     )
     List<Optional<SiteEntity>> findNotIndexedEntities();
+
+    @Modifying
+    @Query(
+            nativeQuery = true,
+            value = "update sites as s set s.status_time = ? where s.id = ?"
+    )
+    void updateStatusTimeById(Temporal time, Long id);
 }
