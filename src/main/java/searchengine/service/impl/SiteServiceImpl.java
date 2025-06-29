@@ -1,24 +1,24 @@
 package searchengine.service.impl;
 
+import jakarta.persistence.EntityManager;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.jsoup.Connection;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.mapper.SiteMapper;
 import searchengine.model.SiteStatus;
-import searchengine.model.dto.entity.SiteDto;
+import searchengine.model.entity.dto.SiteDto;
 import searchengine.model.entity.SiteEntity;
 import searchengine.repository.SiteRepository;
 import searchengine.service.CRUDService;
 
-import java.net.URL;
 import java.time.LocalDateTime;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -30,11 +30,7 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
 
     private final SiteRepository siteRepository;
     private final SiteMapper siteMapper;
-    @Lazy
-    @Autowired
-    private PageServiceImpl pageService;
-    private final LemmaServiceImpl lemmaService;
-    private final IndexServiceImpl indexService;
+    private final EntityManager entityManager;
 
     @Override
     public Optional<SiteDto> findById(Long id) {
@@ -42,11 +38,6 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
                 .map(siteMapper::toDTO);
     }
 
-    public Optional<SiteDto> findByUrlContaining(String url) {
-        return this.siteRepository
-                .findSiteEntitiesByUrlContaining(url)
-                .map(siteMapper::toDTO);
-    }
 
     public Optional<SiteDto> findByUrl(String url) {
         return this.siteRepository
@@ -69,8 +60,15 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
                 .collect(Collectors.toList());
     }
 
-    public SiteDto save(SiteDto siteDTO) {
+    public SiteDto save(Site site) {
+        return save(SiteDto.builder()
+                .url(site.getUrl())
+                .name(site.getName())
+                .statusTime(LocalDateTime.now())
+                .siteStatus(SiteStatus.INDEXING).build());
+    }
 
+    public SiteDto save(SiteDto siteDTO) {
         SiteEntity result = this.siteRepository
                 .findByName(siteDTO.getName())
                 .orElseGet(
@@ -84,7 +82,7 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
 
     }
 
-    public SiteDto updateSite(SiteDto siteDto) {
+    public SiteDto update(SiteDto siteDto) {
         if (siteDto.getId() == null)
             throw new NullPointerException("The field <id> is empty");
 
@@ -97,24 +95,6 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
         return this.save(siteDto);
     }
 
-    @Deprecated
-    public SiteDto updateSiteDepr(SiteDto siteDTO) {
-        SiteDto dto;
-        Optional<SiteEntity> foundSiteEntity = siteRepository.findSiteEntitiesByUrlContaining(siteDTO.getUrl());
-        if (foundSiteEntity.isPresent()) {
-            Long id = foundSiteEntity.get().getId();
-            SiteEntity reference = siteRepository.getReferenceById(id);
-            reference.setSiteStatus(siteDTO.getSiteStatus());
-
-            SiteEntity saved = siteRepository.save(reference);
-            dto = siteMapper.toDTO(saved);
-        } else {
-            dto = this.save(siteDTO);
-        }
-
-        return dto;
-    }
-
     public void updateNotIndexedEntitiesAfterStoppingIndexing(SiteStatus status, CharSequence message) {
         log.info("Обновляем статус сущностей");
         Iterator<SiteDto> it = this.findNotIndexedSites().iterator();
@@ -122,27 +102,8 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
             SiteDto dto = it.next();
             dto.setSiteStatus(status);
             dto.setLastError(message.toString());
-            this.updateSite(dto);
+            this.update(dto);
         }
-    }
-
-    public SiteDto save(Site site) {
-        return save(SiteDto.builder().url(site.getUrl()).name(site.getName()).statusTime(LocalDateTime.now()).siteStatus(SiteStatus.INDEXING).build());
-    }
-
-    public SiteDto createSiteEntityFromJsoupResponse(Connection.Response response) {
-
-        URL responseUrl = response.url();
-
-        String siteName = responseUrl.getHost();
-        String siteUrl = responseUrl.getProtocol().concat("://").concat(responseUrl.getHost());
-
-        return SiteDto.builder()
-                .siteStatus(SiteStatus.INDEXING)
-                .name(siteName)
-                .url(siteUrl)
-                .statusTime(LocalDateTime.now())
-                .build();
     }
 
     @Override
@@ -152,18 +113,15 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
     }
 
     public void clearDatabaseBySiteName(String siteName) {
-        siteRepository
-                .findByName(siteName)
-                .map(SiteEntity::getId)
-                .stream()
-                .findFirst()
-                .ifPresent(
-                        (siteId) -> {
-                            siteRepository.deleteById(siteId);
-                            lemmaService.deleteLemmasBySiteId(siteId);
-                            indexService.deleteIndexesBySiteId(siteId);
-                            pageService.deletePagesBySiteId(siteId);
-                        });
+        siteRepository.findByName(siteName).ifPresent(
+                entity -> {
+                    Long id = entity.getId();
+                    entityManager.createQuery("DELETE FROM LemmaEntity WHERE site = :site")
+                            .setParameter("site", entity)
+                            .executeUpdate();
+                    siteRepository.deleteById(id);
+                }
+        );
     }
 
     public void updateStatusTimeById(Long id) {

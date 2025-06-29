@@ -1,4 +1,4 @@
-package searchengine.model.dto.entity;
+package searchengine.model.entity.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -17,8 +17,4 @@ public class SiteDto {
     private String lastError;
     private String url;
     private String name;
-
-    public SiteDto() {
-        this.setStatusTime(LocalDateTime.now());
-    }
 }

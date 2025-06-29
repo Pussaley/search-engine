@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.model.dto.entity.PageDto;
+import searchengine.model.entity.dto.PageDto;
 import searchengine.mapper.PageMapper;
 import searchengine.model.entity.PageEntity;
 import searchengine.repository.PageRepository;

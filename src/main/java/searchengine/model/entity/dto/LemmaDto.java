@@ -1,4 +1,4 @@
-package searchengine.model.dto.entity;
+package searchengine.model.entity.dto;
 
 import lombok.Builder;
 import lombok.Data;

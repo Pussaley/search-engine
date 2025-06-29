@@ -6,7 +6,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.IndexEntityMapper;
-import searchengine.model.dto.entity.IndexDto;
+import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.IndexEntity;
 import searchengine.repository.IndexRepository;
 import searchengine.service.CRUDService;

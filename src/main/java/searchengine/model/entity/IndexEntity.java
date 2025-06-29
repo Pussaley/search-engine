@@ -31,4 +31,14 @@ public class IndexEntity {
     private Long lemmaId;
     @Column(name = "rankability", nullable = false)
     private Float rank;
+
+    @Override
+    public String toString() {
+        return "IndexEntity{" +
+                "id=" + id +
+                ", pageId=" + pageId +
+                ", lemmaId=" + lemmaId +
+                ", rank=" + rank +
+                '}';
+    }
 }

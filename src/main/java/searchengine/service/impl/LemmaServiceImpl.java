@@ -6,9 +6,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.LemmaEntityMapper;
-import searchengine.model.dto.entity.LemmaDto;
+import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.LemmaEntity;
-import searchengine.model.entity.PageEntity;
 import searchengine.repository.LemmaRepository;
 import searchengine.service.CRUDService;
 

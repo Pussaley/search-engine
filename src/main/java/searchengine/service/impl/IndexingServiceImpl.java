@@ -8,14 +8,12 @@ import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.config.props.concurrency.ConcurrencyProperties;
 import searchengine.model.SiteStatus;
-import searchengine.model.dto.entity.SiteDto;
 import searchengine.model.dto.response.Response;
 import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
 import searchengine.model.dto.response.demo.ResponseSuccessMessageDto;
+import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.IndexingService;
-import searchengine.service.impl.demo.TaskDemo;
-import searchengine.service.recursive.ForkJoinRecursiveTask;
-import searchengine.service.recursive.JsoupSiteIndexingResponse;
+import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
 
 import java.net.URI;
@@ -57,11 +55,16 @@ public class IndexingServiceImpl implements IndexingService<Response> {
 
             executorService.submit(() -> siteList.forEach(site -> executorService.submit(
                             () -> {
+
+                                SiteDto savedSite = null;
+                                SiteStatus status = null;
+                                String error = "";
+
                                 try {
                                     siteService.clearDatabaseBySiteName(site.getName());
-                                    SiteDto savedSite = siteService.save(site);
+                                    savedSite = siteService.save(site);
 
-                                    TaskDemo taskDemo = new TaskDemo(savedSite,
+                                    RecursiveSiteCrawler crawler = new RecursiveSiteCrawler(savedSite,
                                             site.getUrl(),
                                             jsoupParser,
                                             siteService,
@@ -70,17 +73,20 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                                             indexService);
 
                                     log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), site.getName());
-                                    Boolean indexingResult = forkJoinPool.invoke(taskDemo);
+                                    Boolean indexingResult = forkJoinPool.invoke(crawler);
                                     log.info("Индексация сайта {} завершена.", site.getName());
 
-                                    SiteStatus status = indexingResult ? SiteStatus.INDEXED : SiteStatus.FAILED;
+                                    status = indexingResult ? SiteStatus.INDEXED : SiteStatus.FAILED;
 
                                     savedSite.setSiteStatus(status);
-                                    siteService.updateSite(savedSite);
-
+                                } catch (Exception exception) {
+                                    savedSite.setLastError(exception.getMessage());
+                                    savedSite.setSiteStatus(SiteStatus.FAILED);
+                                    log.error("Ошибка типа {} во время индексации сайта {}", exception.getClass(), site.getName());
+                                    exception.printStackTrace();
+                                } finally {
+                                    siteService.update(savedSite);
                                     isRunning.set(false);
-                                } catch (Exception e) {
-                                    log.error("Ошибка типа {} во время индексации сайта {}", e.getClass(), site.getName());
                                 }
                             }
                     )
@@ -147,24 +153,6 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                 isRunning.set(true);
                 executorService.submit(() -> {
 
-                    URI uri = URI.create(url);
-                    String pageScheme = uri.getScheme();
-                    String pageHost = uri.getHost();
-                    String pagePath = uri.getPath();
-                    String pageRawPath = uri.getPath().concat(Objects.isNull(uri.getQuery()) ? "" : url.split(uri.getPath())[1]);
-
-                    String siteUrl = pageScheme.concat("://").concat(pageHost);
-
-                    for (Site site : sites.getSites()) {
-                        if (site.getUrl().contains(siteUrl)) {
-                            log.info("Cайт {} найден в БД, значит ", siteUrl);
-                            siteService.save(site);
-                            break;
-                        }
-                    }
-
-                    ForkJoinRecursiveTask recursiveTask = new ForkJoinRecursiveTask(url);
-                    Response indexingResult = forkJoinPool.invoke(recursiveTask);
                 });
                 return new ResponseSuccessMessageDto(isRunning.get());
             }

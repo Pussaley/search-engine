@@ -2,7 +2,7 @@ package searchengine.mapper;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.MappingConstants;
-import searchengine.model.dto.entity.LemmaDto;
+import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.LemmaEntity;
 
 @Mapper(componentModel = MappingConstants.ComponentModel.SPRING)

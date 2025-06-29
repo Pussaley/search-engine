@@ -1,4 +1,4 @@
-package searchengine.model.dto.entity;
+package searchengine.model.entity.dto;
 
 import lombok.Builder;
 import lombok.Data;
@@ -7,7 +7,7 @@ import lombok.Data;
 @Builder
 public class IndexDto {
     private Long id;
-    private Float rank;
     private Long pageId;
     private Long lemmaId;
+    private Float rank;
 }
