@@ -56,13 +56,21 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             executorService.submit(() -> siteList.forEach(site -> executorService.submit(
                             () -> {
 
-                                SiteDto savedSite = null;
-                                SiteStatus status = null;
+                                SiteStatus status = SiteStatus.INDEXING;
                                 String error = "";
+                                SiteDto savedSite = null;
 
                                 try {
                                     siteService.clearDatabaseBySiteName(site.getName());
-                                    savedSite = siteService.save(site);
+                                    SiteDto siteDto = SiteDto.builder()
+                                            .siteStatus(status)
+                                            .statusTime(LocalDateTime.now())
+                                            .name(site.getName())
+                                            .url(site.getUrl())
+                                            .lastError(error)
+                                            .build();
+
+                                    savedSite = siteService.save(siteDto);
 
                                     RecursiveSiteCrawler crawler = new RecursiveSiteCrawler(savedSite,
                                             site.getUrl(),
@@ -152,7 +160,43 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                 initExecutorService(Executors.newCachedThreadPool());
                 isRunning.set(true);
                 executorService.submit(() -> {
+                    try {
+                        SiteDto savedSiteDto = null;
+                        for (Site site : sites.getSites()) {
+                            if (url.contains(site.getUrl())) {
+                                siteService.clearDatabaseBySiteName(site.getName());
+                                SiteDto siteDto = SiteDto.builder()
+                                        .siteStatus(SiteStatus.INDEXING)
+                                        .statusTime(LocalDateTime.now())
+                                        .name(site.getName())
+                                        .url(site.getUrl())
+                                        .lastError("")
+                                        .build();
 
+                                savedSiteDto = siteService.save(siteDto);
+                            }
+                        }
+                        if (Objects.nonNull(savedSiteDto)) {
+                            RecursiveSiteCrawler crawler = new RecursiveSiteCrawler(
+                                    savedSiteDto,
+                                    url,
+                                    jsoupParser,
+                                    siteService,
+                                    pageService,
+                                    lemmaService,
+                                    indexService);
+                            log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), savedSiteDto.getName());
+                            Boolean resultOfIndexing = forkJoinPool.invoke(crawler);
+                            log.info("Индексация сайта {} завершена.", savedSiteDto.getName());
+
+                            SiteStatus status = resultOfIndexing ? SiteStatus.INDEXED : SiteStatus.FAILED;
+                            savedSiteDto.setSiteStatus(status);
+
+                            siteService.update(savedSiteDto);
+                        }
+                    } finally {
+                        isRunning.set(false);
+                    }
                 });
                 return new ResponseSuccessMessageDto(isRunning.get());
             }

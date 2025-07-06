@@ -6,8 +6,6 @@ import lombok.Data;
 @Data
 @Builder
 public class IndexDto {
-    private Long id;
-    private Long pageId;
-    private Long lemmaId;
+    private IndexDtoKey id;
     private Float rank;
 }

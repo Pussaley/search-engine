@@ -6,31 +6,32 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.LemmaEntityMapper;
-import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.LemmaEntity;
+import searchengine.model.entity.dto.LemmaDto;
 import searchengine.repository.LemmaRepository;
 import searchengine.service.CRUDService;
 
-import java.util.Objects;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(propagation = Propagation.REQUIRES_NEW)
-public class LemmaServiceImpl implements CRUDService<LemmaDto> {
+public class LemmaServiceImpl implements CRUDService<LemmaDto, Long> {
 
     private final LemmaRepository lemmaRepository;
     private final LemmaEntityMapper lemmaMapper;
 
     @Override
     public Optional<LemmaDto> findById(Long id) {
-        return lemmaRepository.findById(id).map(lemmaMapper::toDto);
+        return lemmaRepository.findById(id)
+                .map(lemmaMapper::toDto);
     }
 
-    public Optional<LemmaDto> findByLemma(String lemma) {
-        return lemmaRepository.findByLemma(lemma)
-                .map(lemmaMapper::toDto);
+    public List<LemmaDto> findByLemma(String lemma) {
+        return lemmaRepository.findByLemma(lemma).stream().map(lemmaMapper::toDto).collect(Collectors.toList());
     }
 
     @Override
@@ -42,7 +43,7 @@ public class LemmaServiceImpl implements CRUDService<LemmaDto> {
     }
 
     public LemmaDto update(LemmaDto lemmaDto) {
-        return Objects.isNull(lemmaDto.getId()) ? lemmaDto : lemmaMapper.toDto(lemmaRepository.save(lemmaMapper.toEntity(lemmaDto)));
+        return lemmaMapper.toDto(lemmaRepository.save(lemmaMapper.toEntity(lemmaDto)));
     }
 
     public void deleteLemmasBySiteId(Long siteId) {
@@ -51,8 +52,7 @@ public class LemmaServiceImpl implements CRUDService<LemmaDto> {
     }
 
     @Override
-    public boolean deleteById(Long id) {
+    public void deleteById(Long id) {
         lemmaRepository.deleteById(id);
-        return lemmaRepository.existsById(id);
     }
 }

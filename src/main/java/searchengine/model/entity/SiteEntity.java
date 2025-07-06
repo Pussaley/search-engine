@@ -26,9 +26,8 @@ import java.util.List;
 @Table(name = "sites")
 @Slf4j
 public class SiteEntity {
-
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
     @Column(name = "status", columnDefinition = "ENUM ('INDEXING', 'INDEXED', 'FAILED')", nullable = false)
     @Enumerated(value = EnumType.STRING)

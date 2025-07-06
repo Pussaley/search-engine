@@ -9,7 +9,7 @@ import searchengine.model.entity.IndexEntity;
 import java.util.Optional;
 
 @Repository
-public interface IndexRepository extends JpaRepository<IndexEntity, Long> {
+public interface IndexRepository extends JpaRepository<IndexEntity, IndexEntity.IndexEntityKey> {
 
     @Query(
             nativeQuery = true,
@@ -21,4 +21,10 @@ public interface IndexRepository extends JpaRepository<IndexEntity, Long> {
             nativeQuery = true,
             value = "delete from indexes as i where i.page_id = ?")
     void deleteIndexesByPageId(Long pageId);
+
+    @Modifying
+    @Query(
+            nativeQuery = true,
+            value = "delete from indexes as i where lemma_id = ? and page_id = ?")
+    void deleteByLemmaIdAndPageId(Long lemmaId, Long pageId);
 }

@@ -7,6 +7,7 @@ import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import searchengine.model.entity.dto.IndexDto;
+import searchengine.model.entity.dto.IndexDtoKey;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
@@ -18,9 +19,11 @@ import searchengine.service.morphology.LemmaFinder;
 import searchengine.util.jsoup.JSOUPParser;
 
 import java.net.SocketTimeoutException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
@@ -28,6 +31,7 @@ import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
+import java.util.concurrent.Semaphore;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -47,6 +51,7 @@ public class RecursiveSiteCrawler extends RecursiveTask<Boolean> {
     @Setter
     private final boolean newIndexing;
     private static final Set<String> parsedPages = ConcurrentHashMap.newKeySet();
+    private Semaphore semaphore = new Semaphore(1);
 
     public RecursiveSiteCrawler(SiteDto siteDto, String url, JSOUPParser jsoupParser, SiteServiceImpl siteService, PageServiceImpl pageService, LemmaServiceImpl lemmaService, IndexServiceImpl indexService) {
         this(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, true);
@@ -71,6 +76,13 @@ public class RecursiveSiteCrawler extends RecursiveTask<Boolean> {
 
         if (newIndexing)
             parsedPages.removeIf(elem -> elem.contains(siteDto.getUrl()));
+
+/*        BlockingQueue queue = new BlockingQueue();
+
+        new Thread(() -> {
+            while (true)
+                queue.get().run();
+        }).start();*/
     }
 
     @Override
@@ -95,8 +107,6 @@ public class RecursiveSiteCrawler extends RecursiveTask<Boolean> {
                     .map(e -> e.endsWith("/") ? e : e.concat("/"))
                     .filter(parsedPages::add)
                     .collect(Collectors.toCollection(HashSet::new));
-
-            //Collection<ForkJoinTask<Boolean>> tasks = new HashSet<>();
 
             ForkJoinTask<Boolean>[] tasksArray = new ForkJoinTask[pages.size()];
 
@@ -128,30 +138,44 @@ public class RecursiveSiteCrawler extends RecursiveTask<Boolean> {
                         String lemma = entry.getKey();
                         Integer lemmaCount = entry.getValue();
 
-                        synchronized (lemma.intern()) {
-                            LemmaDto lemmaDto = lemmaService.findByLemma(lemma)
+                        LemmaDto lemmaDto;
+
+                        try {
+                            semaphore.acquire();
+                            lemmaDto = lemmaService.findByLemma(lemma)
+                                    .stream()
+                                    .filter(dto -> dto.getSite().getId().equals(siteDto.getId()))
+                                    .findFirst()
                                     .orElseGet(() -> LemmaDto.builder()
+                                            .frequency(1)
                                             .lemma(lemma)
                                             .site(siteDto)
-                                            .frequency(1)
                                             .build());
+                        } finally {
+                            semaphore.release();
+                        }
 
-                            LemmaDto savedLemma;
+                        LemmaDto savedLemma;
+
+                        synchronized (lemmaDto) {
                             if (Objects.isNull(lemmaDto.getId())) {
                                 savedLemma = lemmaService.save(lemmaDto);
                             } else {
                                 lemmaDto.setFrequency(lemmaDto.getFrequency() + 1);
                                 savedLemma = lemmaService.update(lemmaDto);
                             }
-
-                            Long lemmaId = savedLemma.getId();
-                            indexService.findByLemmaIdAndPageId(lemmaId, pageId).orElseGet(() ->
-                                    indexService.save(IndexDto.builder()
-                                            .lemmaId(lemmaId)
-                                            .pageId(pageId)
-                                            .rank((float) lemmaCount)
-                                            .build()));
                         }
+                        Long lemmaId = savedLemma.getId();
+
+                        IndexDtoKey indexDtoKey = new IndexDtoKey(pageId, lemmaId);
+
+                        indexService.findById(indexDtoKey).orElseGet(() ->
+                                indexService.save(IndexDto
+                                        .builder()
+                                        .id(indexDtoKey)
+                                        .rank((float) lemmaCount)
+                                        .build()));
+
                     }
                 }
             }
@@ -215,6 +239,30 @@ public class RecursiveSiteCrawler extends RecursiveTask<Boolean> {
 
         RequestStatusCode(int code) {
             this.code = code;
+        }
+    }
+
+    static class BlockingQueue {
+        List<Runnable> tasks = new ArrayList<>();
+
+        public synchronized Runnable get() {
+            while (tasks.isEmpty()) {
+                try {
+                    wait();
+                } catch (InterruptedException interruptedException) {
+                    log.error("Was interrupted");
+                    interruptedException.printStackTrace();
+                }
+            }
+
+            Runnable task = tasks.get(0);
+            tasks.remove(task);
+            return task;
+        }
+
+        public synchronized void put(Runnable task) {
+            tasks.add(task);
+            notify();
         }
     }
 }

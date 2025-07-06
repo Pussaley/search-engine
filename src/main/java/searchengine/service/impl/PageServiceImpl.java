@@ -16,7 +16,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
-public class PageServiceImpl implements CRUDService<PageDto> {
+public class PageServiceImpl implements CRUDService<PageDto, Long> {
 
     private final PageRepository pageRepository;
     private final PageMapper pageMapper;
@@ -31,9 +31,8 @@ public class PageServiceImpl implements CRUDService<PageDto> {
     }
 
     @Override
-    public boolean deleteById(Long id) {
+    public void deleteById(Long id) {
         pageRepository.deleteById(id);
-        return !pageRepository.existsById(id);
     }
 
     public PageDto save(PageDto pageDTO) {

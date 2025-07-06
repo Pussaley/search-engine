@@ -1,6 +1,5 @@
 package searchengine.model.entity;
 
-import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -14,7 +13,6 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -23,7 +21,6 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @Table(name = "pages", indexes = @Index(name = "page_path_idx", columnList = "path"))
-@Slf4j
 public class PageEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
@@ -37,7 +34,7 @@ public class PageEntity {
     @ManyToOne
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
-    @ManyToMany(cascade = {CascadeType.PERSIST, CascadeType.MERGE})
+    @ManyToMany
     @JoinTable(name = "indexes",
             joinColumns = @JoinColumn(name = "page_id"),
             inverseJoinColumns = @JoinColumn(name = "lemma_id"))

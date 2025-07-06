@@ -4,17 +4,16 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Embeddable;
 import jakarta.persistence.EmbeddedId;
 import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import lombok.AllArgsConstructor;
 import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.io.Serializable;
-import java.lang.annotation.Target;
 
 @Entity
 @Getter
@@ -22,23 +21,21 @@ import java.lang.annotation.Target;
 @NoArgsConstructor
 @Table(name = "indexes")
 public class IndexEntity {
-    @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
-    private Long id;
-    @Column(name = "page_id", nullable = false, updatable = false)
-    private Long pageId;
-    @Column(name = "lemma_id", nullable = false)
-    private Long lemmaId;
-    @Column(name = "rankability", nullable = false)
+    @EmbeddedId
+    private IndexEntityKey id;
+    @Column(name = "rank_ability", nullable = false)
     private Float rank;
 
-    @Override
-    public String toString() {
-        return "IndexEntity{" +
-                "id=" + id +
-                ", pageId=" + pageId +
-                ", lemmaId=" + lemmaId +
-                ", rank=" + rank +
-                '}';
+    @Embeddable
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @EqualsAndHashCode
+    public static class IndexEntityKey implements Serializable {
+        @Column(name = "lemma_id", insertable = false, updatable = false)
+        private Long lemmaId;
+        @Column(name = "page_id", insertable = false, updatable = false)
+        private Long pageId;
     }
 }

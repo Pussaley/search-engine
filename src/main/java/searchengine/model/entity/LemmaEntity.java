@@ -27,12 +27,12 @@ public class LemmaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.AUTO)
     private Long id;
-    @Column(name = "lemma", updatable = false, nullable = false)
+    @Column(name = "lemma", nullable = false)
     private String lemma;
-    @Column(name = "frequency", updatable = false, nullable = false)
+    @Column(name = "frequency", nullable = false)
     private Integer frequency;
     @ManyToOne
-    @JoinColumn(name = "site_id", updatable = false, nullable = false)
+    @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
     @ManyToMany(mappedBy = "lemmas")
     private List<PageEntity> pages = new ArrayList<>();

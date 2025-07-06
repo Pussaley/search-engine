@@ -18,7 +18,7 @@ public class LemmaFinder {
     private final String[] particlesNames = new String[]{"МЕЖД", "ПРЕДЛ", "СОЮЗ", "ЧАСТ"};
 
     public static LemmaFinder getInstance() throws IOException {
-        LuceneMorphology morphology= new RussianLuceneMorphology();
+        LuceneMorphology morphology = new RussianLuceneMorphology();
         return new LemmaFinder(morphology);
     }
 
@@ -29,12 +29,10 @@ public class LemmaFinder {
     public synchronized Map<String, Integer> collectLemmas(String text) {
         String[] words = arrayContainsRussianWords(clearFromHTMLTags(text));
 
-        HashMap<String, Integer> collect = Arrays.stream(words)
+        return Arrays.stream(words)
                 .filter(this::isNormalBaseWord)
                 .map(word -> morphology.getNormalForms(word).get(0))
                 .collect(Collectors.toMap(Function.identity(), a -> 1, Integer::sum, HashMap::new));
-
-        return collect;
     }
 
     private boolean isNormalBaseWord(String word) {
@@ -43,13 +41,16 @@ public class LemmaFinder {
     }
 
     private String[] arrayContainsRussianWords(String text) {
-        return text.toLowerCase().replaceAll("([^а-я\\s])", " ")
+        return text.toLowerCase()
+                .replaceAll("ё", "е")
+                .replaceAll("([^а-я\\s])", " ")
+                .replaceAll("\\s+", " ")
                 .trim()
                 .split("\\s+");
     }
 
     private String clearFromHTMLTags(String text) {
         final String regExp = "<{1}[^>]+>{1}";
-        return text.replaceAll(regExp, "").replaceAll("\\t", " ");
+        return text.replaceAll(regExp, " ");
     }
 }
