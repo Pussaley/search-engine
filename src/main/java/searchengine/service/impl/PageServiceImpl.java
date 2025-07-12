@@ -10,24 +10,32 @@ import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.PageRepository;
 import searchengine.service.CRUDService;
 
+import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
-public class PageServiceImpl implements CRUDService<PageDto, Long> {
+public class PageServiceImpl implements CRUDService<PageDto> {
 
     private final PageRepository pageRepository;
     private final PageMapper pageMapper;
 
+    public PageEntity getReferenceById(Long pageId) {
+        return pageRepository.getReferenceById(pageId);
+    }
+
     @Override
+    @Transactional(readOnly = true)
     public Optional<PageDto> findById(Long id) {
         return pageRepository.findById(id).map(pageMapper::toDto);
     }
 
-    public Optional<PageDto> findByPath(String path) {
-        return pageRepository.findByPath(path).map(pageMapper::toDto);
+    @Transactional(readOnly = true)
+    public List<PageDto> findByPath(String path) {
+        return pageRepository.findByPath(path).stream().map(pageMapper::toDto).toList();
     }
 
     @Override
@@ -36,12 +44,16 @@ public class PageServiceImpl implements CRUDService<PageDto, Long> {
     }
 
     public PageDto save(PageDto pageDTO) {
-        return findByPath(pageDTO.getPath()).orElseGet(() -> {
-            PageEntity entity = pageMapper.toEntity(pageDTO);
-            PageEntity saved = pageRepository.save(entity);
-            pageRepository.flush();
-            return pageMapper.toDto(saved);
-        });
+        return findByPath(pageDTO.getPath())
+                .stream()
+                .filter(el -> Objects.equals(el.getSite().getId(), pageDTO.getSite().getId()))
+                .findFirst()
+                .orElseGet(() -> {
+                    PageEntity entity = pageMapper.toEntity(pageDTO);
+                    PageEntity saved = pageRepository.save(entity);
+                    pageRepository.flush();
+                    return pageMapper.toDto(saved);
+                });
     }
 
     public void deletePagesBySiteId(Long id) {
@@ -49,6 +61,7 @@ public class PageServiceImpl implements CRUDService<PageDto, Long> {
         pageRepository.flush();
     }
 
+    @Transactional(readOnly = true)
     public Optional<PageDto> findByPathAndSiteUrl(String pagePath, String siteUrl) {
         return this.pageRepository.findByPathAndSiteUrl(pagePath, siteUrl).map(pageMapper::toDto);
     }

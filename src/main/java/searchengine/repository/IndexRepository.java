@@ -5,16 +5,17 @@ import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import searchengine.model.entity.IndexEntity;
+import searchengine.model.entity.key.IndexEntityId;
 
 import java.util.Optional;
 
 @Repository
-public interface IndexRepository extends JpaRepository<IndexEntity, IndexEntity.IndexEntityKey> {
+public interface IndexRepository extends JpaRepository<IndexEntity, IndexEntityId> {
 
     @Query(
             nativeQuery = true,
-            value = "select * from indexes as i where lemma_id = ? and page_id = ?")
-    Optional<IndexEntity> findByLemmaIdAndPageId(Long lemmaId, Long pageId);
+            value = "select * from indexes as i where page_id = ? and lemma_id = ?")
+    Optional<IndexEntity> findByPageIdAndLemmaId(Long pageId, Long lemmaId);
 
     @Modifying
     @Query(

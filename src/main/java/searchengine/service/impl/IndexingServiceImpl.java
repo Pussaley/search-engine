@@ -13,6 +13,7 @@ import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
 import searchengine.model.dto.response.demo.ResponseSuccessMessageDto;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.IndexingService;
+import searchengine.service.demo.SitePageServiceTest;
 import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
 
@@ -40,8 +41,9 @@ public class IndexingServiceImpl implements IndexingService<Response> {
     private final PageServiceImpl pageService;
     private final LemmaServiceImpl lemmaService;
     private final IndexServiceImpl indexService;
-    private static ForkJoinPool forkJoinPool;
-    private static ExecutorService executorService;
+    private final SitePageServiceTest sitePageServiceTest;
+    private ForkJoinPool forkJoinPool;
+    private ExecutorService executorService;
     private final AtomicBoolean isRunning = new AtomicBoolean(false);
 
     @Override
@@ -55,51 +57,51 @@ public class IndexingServiceImpl implements IndexingService<Response> {
 
             executorService.submit(() -> siteList.forEach(site -> executorService.submit(
                             () -> {
-
-                                SiteStatus status = SiteStatus.INDEXING;
-                                String error = "";
                                 SiteDto savedSite = null;
+                                SiteDto siteDto = SiteDto.builder()
+                                        .siteStatus(SiteStatus.INDEXING)
+                                        .statusTime(LocalDateTime.now())
+                                        .name(site.getName())
+                                        .url(site.getUrl())
+                                        .lastError(null)
+                                        .build();
 
                                 try {
-                                    siteService.clearDatabaseBySiteName(site.getName());
-                                    SiteDto siteDto = SiteDto.builder()
-                                            .siteStatus(status)
-                                            .statusTime(LocalDateTime.now())
-                                            .name(site.getName())
-                                            .url(site.getUrl())
-                                            .lastError(error)
-                                            .build();
+                                    sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
+                                    log.info("Очищение базы успешно завершено");
 
                                     savedSite = siteService.save(siteDto);
 
-                                    RecursiveSiteCrawler crawler = new RecursiveSiteCrawler(savedSite,
+                                    log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), site.getName());
+                                    SiteStatus status = crawlingSite(new RecursiveSiteCrawler(savedSite,
                                             site.getUrl(),
                                             jsoupParser,
                                             siteService,
                                             pageService,
                                             lemmaService,
-                                            indexService);
-
-                                    log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), site.getName());
-                                    Boolean indexingResult = forkJoinPool.invoke(crawler);
+                                            indexService,
+                                            sitePageServiceTest,
+                                            true));
                                     log.info("Индексация сайта {} завершена.", site.getName());
-
-                                    status = indexingResult ? SiteStatus.INDEXED : SiteStatus.FAILED;
 
                                     savedSite.setSiteStatus(status);
                                 } catch (Exception exception) {
-                                    savedSite.setLastError(exception.getMessage());
-                                    savedSite.setSiteStatus(SiteStatus.FAILED);
-                                    log.error("Ошибка типа {} во время индексации сайта {}", exception.getClass(), site.getName());
+                                    if (Objects.nonNull(savedSite)) {
+                                        savedSite.setLastError(exception.getMessage());
+                                        savedSite.setSiteStatus(SiteStatus.FAILED);
+                                    }
+                                    log.error("Исключение {} во время индексации сайта {}", exception.getClass().getSimpleName(), site.getName());
                                     exception.printStackTrace();
                                 } finally {
-                                    siteService.update(savedSite);
+                                    if (Objects.nonNull(savedSite)) {
+                                        savedSite.setStatusTime(LocalDateTime.now());
+                                        siteService.update(savedSite);
+                                    }
                                     isRunning.set(false);
                                 }
                             }
                     )
             ));
-
             return new ResponseSuccessMessageDto(isRunning.get());
         } else {
             log.info("Индексация уже запущена");
@@ -107,25 +109,85 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         }
     }
 
-    @Override
-    public Response stopIndexing() {
+    public Response indexPage(String url) {
+        if (isRunning.get())
+            return new ResponseErrorMessageDto(false,
+                    "Индексация уже запущена");
+        if (!isRelativePage(url))
+            return new ResponseErrorMessageDto(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
 
         try {
-            Objects.requireNonNull(forkJoinPool);
+            initFJP();
+            initExecutorService(1);
+            isRunning.set(true);
+            executorService.submit(() -> {
+                try {
+                    for (Site site : sites.getSites()) {
+                        if (url.contains(site.getUrl())) {
+                            sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
+                            log.info("Очищение базы успешно завершено");
+                            SiteDto siteDto = SiteDto.builder()
+                                    .siteStatus(SiteStatus.INDEXING)
+                                    .statusTime(LocalDateTime.now())
+                                    .name(site.getName())
+                                    .url(site.getUrl())
+                                    .lastError("")
+                                    .build();
 
-            if (!isRunning.get()) {
-                log.info("Индексация не запущена");
-                return new ResponseErrorMessageDto(isRunning.get(), "Индексация не запущена");
-            }
+                            SiteDto savedSiteDto = siteService.save(siteDto);
+                            log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), savedSiteDto.getName());
+                            SiteStatus status = crawlingSite(new RecursiveSiteCrawler(
+                                    savedSiteDto,
+                                    url,
+                                    jsoupParser,
+                                    siteService,
+                                    pageService,
+                                    lemmaService,
+                                    indexService,
+                                    sitePageServiceTest));
+                            log.info("Индексация сайта {} завершена.", site.getName());
 
+                            savedSiteDto.setSiteStatus(status);
+                            siteService.update(savedSiteDto);
+                        }
+                    }
+                } finally {
+                    isRunning.set(false);
+                }
+            });
+        } catch (Exception exception) {
+            log.info(exception.getClass().getSimpleName());
+            return new ResponseErrorMessageDto(false,
+                    MessageFormat.format("Неизвестная ошибка: {0}. Message: {1}",
+                            exception.getClass().getSimpleName(),
+                            exception.getMessage()));
+        }
+        return new ResponseSuccessMessageDto(isRunning.get());
+    }
+
+    private SiteStatus crawlingSite(RecursiveSiteCrawler siteCrawler) {
+        Boolean indexingResult = forkJoinPool.invoke(siteCrawler);
+        return indexingResult ? SiteStatus.INDEXED : SiteStatus.FAILED;
+    }
+
+    @Override
+    public Response stopIndexing() {
+        if (!isRunning.get()) {
+            log.info("Индексация не запущена");
+            return new ResponseErrorMessageDto(isRunning.get(), "Индексация не запущена");
+        }
+
+        executorService.submit(() -> {
             int defaultTimeOut = concurrencyProperties.getShutdownTimeout();
+
             boolean terminated = false;
             try {
-                forkJoinPool.shutdown();
+                forkJoinPool.shutdownNow();
                 log.info("Индексация была остановлена пользователем");
                 terminated = forkJoinPool.awaitTermination(defaultTimeOut, TimeUnit.SECONDS);
             } catch (InterruptedException e) {
-                log.info("Ожидание завершения FJP было прервано <{}>", e.getMessage());
+                log.info("Ожидание завершения работы ForkJoinPool'а было прервано <{}>", e.getMessage());
+                Thread.currentThread().interrupt();
             } finally {
                 if (!forkJoinPool.isTerminated() || !terminated) {
                     try {
@@ -138,95 +200,28 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                     }
                 }
 
-                executorService.submit(
-                        () -> siteService.updateNotIndexedEntitiesAfterStoppingIndexing(
-                                SiteStatus.FAILED, "Индексация была остановлена пользователем"));
+                siteService.updateAllSitesSiteStatus(SiteStatus.INDEXING, SiteStatus.FAILED);
+                isRunning.set(false);
+                log.info("Индексация полностью остановлена");
             }
-            return new ResponseSuccessMessageDto(isRunning.getAndSet(false));
-        } catch (NullPointerException npe) {
-            return new ResponseErrorMessageDto(isRunning.get(), "Индексация не запущена, FJP не был инициализирован");
-        }
+        });
+        return new ResponseSuccessMessageDto(true);
     }
 
-    public Response indexPage(String url) {
-        try {
-            if (isRunning.get())
-                return new ResponseErrorMessageDto(false,
-                        "Индексация уже запущена");
-            if (!isRelativePage(url))
-                return new ResponseErrorMessageDto(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
-            else {
-                initFJP();
-                initExecutorService(Executors.newCachedThreadPool());
-                isRunning.set(true);
-                executorService.submit(() -> {
-                    try {
-                        SiteDto savedSiteDto = null;
-                        for (Site site : sites.getSites()) {
-                            if (url.contains(site.getUrl())) {
-                                siteService.clearDatabaseBySiteName(site.getName());
-                                SiteDto siteDto = SiteDto.builder()
-                                        .siteStatus(SiteStatus.INDEXING)
-                                        .statusTime(LocalDateTime.now())
-                                        .name(site.getName())
-                                        .url(site.getUrl())
-                                        .lastError("")
-                                        .build();
-
-                                savedSiteDto = siteService.save(siteDto);
-                            }
-                        }
-                        if (Objects.nonNull(savedSiteDto)) {
-                            RecursiveSiteCrawler crawler = new RecursiveSiteCrawler(
-                                    savedSiteDto,
-                                    url,
-                                    jsoupParser,
-                                    siteService,
-                                    pageService,
-                                    lemmaService,
-                                    indexService);
-                            log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), savedSiteDto.getName());
-                            Boolean resultOfIndexing = forkJoinPool.invoke(crawler);
-                            log.info("Индексация сайта {} завершена.", savedSiteDto.getName());
-
-                            SiteStatus status = resultOfIndexing ? SiteStatus.INDEXED : SiteStatus.FAILED;
-                            savedSiteDto.setSiteStatus(status);
-
-                            siteService.update(savedSiteDto);
-                        }
-                    } finally {
-                        isRunning.set(false);
-                    }
-                });
-                return new ResponseSuccessMessageDto(isRunning.get());
-            }
-        } catch (Exception exception) {
-            log.info(exception.getClass().getSimpleName());
-            return new ResponseErrorMessageDto(false,
-                    MessageFormat.format("Неизвестная ошибка: {0}. Message: {1}",
-                            exception.getClass().getSimpleName(),
-                            exception.getMessage()));
-        }
-    }
-
-    private boolean isRelativePage(String url) throws Exception {
+    private boolean isRelativePage(String url) {
         URI uri = URI.create(url);
         return sites.getSites().stream().anyMatch(site -> site.getUrl().contains(uri.getScheme().concat("://").concat(uri.getHost())));
     }
 
-    private static ForkJoinPool initFJP() {
-        if (Objects.isNull(forkJoinPool))
+    private void initFJP() {
+        if (forkJoinPool == null || forkJoinPool.isShutdown()) {
             forkJoinPool = new ForkJoinPool();
-        return forkJoinPool;
+        }
     }
 
-    private static ExecutorService initExecutorService(int size) {
-        return initExecutorService(Executors.newFixedThreadPool(size));
-    }
-
-    private static ExecutorService initExecutorService(ExecutorService executor) {
-        if (Objects.isNull(executorService))
-            executorService = executor;
-        return executorService;
+    private void initExecutorService(int size) {
+        if (executorService == null || executorService.isShutdown()) {
+            executorService = Executors.newFixedThreadPool(size);
+        }
     }
 }

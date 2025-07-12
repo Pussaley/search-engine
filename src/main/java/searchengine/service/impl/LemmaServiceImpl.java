@@ -3,10 +3,10 @@ package searchengine.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.LemmaEntityMapper;
 import searchengine.model.entity.LemmaEntity;
+import searchengine.model.entity.PageEntity;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.repository.LemmaRepository;
 import searchengine.service.CRUDService;
@@ -18,11 +18,15 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(propagation = Propagation.REQUIRES_NEW)
-public class LemmaServiceImpl implements CRUDService<LemmaDto, Long> {
+@Transactional
+public class LemmaServiceImpl implements CRUDService<LemmaDto> {
 
     private final LemmaRepository lemmaRepository;
     private final LemmaEntityMapper lemmaMapper;
+
+    public LemmaEntity getReferenceById(Long lemmaId) {
+        return lemmaRepository.getReferenceById(lemmaId);
+    }
 
     @Override
     public Optional<LemmaDto> findById(Long id) {
@@ -54,5 +58,9 @@ public class LemmaServiceImpl implements CRUDService<LemmaDto, Long> {
     @Override
     public void deleteById(Long id) {
         lemmaRepository.deleteById(id);
+    }
+
+    public Optional<LemmaDto> findByLemmaAndSiteId(String lemma, Long id) {
+        return lemmaRepository.findByLemmaAndSiteId(lemma, id).map(lemmaMapper::toDto);
     }
 }

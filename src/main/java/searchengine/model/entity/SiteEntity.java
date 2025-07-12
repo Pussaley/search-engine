@@ -12,19 +12,16 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.hibernate.annotations.UpdateTimestamp;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.HashSet;
+import java.util.Set;
 
 @Entity
 @Data
 @NoArgsConstructor
 @Table(name = "sites")
-@Slf4j
 public class SiteEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -33,7 +30,6 @@ public class SiteEntity {
     @Enumerated(value = EnumType.STRING)
     private SiteStatus siteStatus;
     @Column(name = "status_time", nullable = false)
-    @UpdateTimestamp
     private LocalDateTime statusTime;
     @Column(name = "last_error", columnDefinition = "VARCHAR(255)")
     private String lastError;
@@ -41,6 +37,8 @@ public class SiteEntity {
     private String url;
     @Column(name = "name", columnDefinition = "VARCHAR(255)", nullable = false, unique = true)
     private String name;
-    @OneToMany(cascade = CascadeType.ALL, mappedBy = "site")
-    private List<PageEntity> pages = new ArrayList<>();
+    @OneToMany(cascade = CascadeType.REMOVE)
+    private Set<PageEntity> pages = new HashSet<>();
+    @OneToMany(cascade = CascadeType.REMOVE)
+    private Set<LemmaEntity> lemmas = new HashSet<>();
 }

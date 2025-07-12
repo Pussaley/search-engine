@@ -1,7 +1,5 @@
 package searchengine.service.impl;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -14,22 +12,20 @@ import searchengine.repository.SiteRepository;
 import searchengine.service.CRUDService;
 
 import java.time.LocalDateTime;
+import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 @Transactional
-public class SiteServiceImpl implements CRUDService<SiteDto, Long> {
+public class SiteServiceImpl implements CRUDService<SiteDto> {
 
     private final SiteRepository siteRepository;
     private final SiteMapper siteMapper;
-    @PersistenceContext
-    private final EntityManager entityManager;
 
     @Override
     public Optional<SiteDto> findById(Long id) {
@@ -38,12 +34,8 @@ public class SiteServiceImpl implements CRUDService<SiteDto, Long> {
     }
 
     public List<SiteDto> findNotIndexedSites() {
-        return this.siteRepository.findNotIndexedEntities()
-                .stream()
-                .filter(Optional::isPresent)
-                .map(Optional::get)
-                .map(siteMapper::toDTO)
-                .collect(Collectors.toList());
+        List<SiteEntity> list = this.siteRepository.findSitesByStatusNotIndexed();
+        return list.isEmpty() ? Collections.emptyList() : list.stream().map(siteMapper::toDTO).toList();
     }
 
     public SiteDto save(SiteDto siteDTO) {
@@ -60,16 +52,16 @@ public class SiteServiceImpl implements CRUDService<SiteDto, Long> {
 
     }
 
-    public void update(SiteDto siteDto) {
+    public SiteDto update(SiteDto siteDto) {
         if (Objects.isNull(siteDto.getId()))
             throw new NullPointerException("The field <id> is empty");
 
-        this.siteRepository.findById(siteDto.getId())
-                .ifPresentOrElse(entity -> entityManager.merge(siteMapper.toEntity(siteDto)),
-                        () -> log.error("Updating failed, reason: id {} not existed", siteDto.getId()));
+        siteDto.setStatusTime(LocalDateTime.now());
+        return siteMapper.toDTO(siteRepository.save(siteMapper.toEntity(siteDto)));
+
     }
 
-    public void updateNotIndexedEntitiesAfterStoppingIndexing(SiteStatus status, CharSequence message) {
+    public void updateNotIndexedEntities(SiteStatus status, CharSequence message) {
         log.info("Обновляем статус сущностей");
         Iterator<SiteDto> it = this.findNotIndexedSites().iterator();
         while (it.hasNext()) {
@@ -85,20 +77,16 @@ public class SiteServiceImpl implements CRUDService<SiteDto, Long> {
         this.siteRepository.deleteById(id);
     }
 
-    public void clearDatabaseBySiteName(String siteName) {
-        siteRepository.findByName(siteName).ifPresent(
-                entity -> {
-                    Long id = entity.getId();
-                    entityManager.createQuery("DELETE FROM LemmaEntity WHERE site = :site")
-                            .setParameter("site", entity)
-                            .executeUpdate();
-                    siteRepository.deleteById(id);
-                }
-        );
-        log.info("Очищение базы успешно завершено");
-    }
 
     public void updateStatusTimeById(Long id) {
         siteRepository.updateStatusTimeById(LocalDateTime.now(), id);
+    }
+
+    public Optional<SiteDto> findByName(String name) {
+        return siteRepository.findByName(name).map(siteMapper::toDTO);
+    }
+
+    public void updateAllSitesSiteStatus(SiteStatus oldStatus, SiteStatus newStatus) {
+        siteRepository.updateAllSitesSiteStatus(oldStatus, newStatus, LocalDateTime.now());
     }
 }

@@ -38,7 +38,7 @@ public class ApiController {
 
     @PostMapping("/indexPage")
     public ResponseEntity<?> indexPage(@RequestParam String url) {
-        return new ResponseEntity<>(indexingService.indexPage(url), HttpStatus.OK);
+        return ResponseEntity.ok(indexingService.indexPage(url));
     }
 
     @GetMapping("/statistics")
