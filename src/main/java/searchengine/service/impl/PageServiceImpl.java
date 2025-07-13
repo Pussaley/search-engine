@@ -38,6 +38,10 @@ public class PageServiceImpl implements CRUDService<PageDto> {
         return pageRepository.findByPath(path).stream().map(pageMapper::toDto).toList();
     }
 
+    public Optional<PageDto> findByPathAndSiteId(String path, Long siteId) {
+        return pageRepository.findByPathAndSiteId(path, siteId).map(pageMapper::toDto);
+    }
+
     @Override
     public void deleteById(Long id) {
         pageRepository.deleteById(id);
@@ -54,15 +58,5 @@ public class PageServiceImpl implements CRUDService<PageDto> {
                     pageRepository.flush();
                     return pageMapper.toDto(saved);
                 });
-    }
-
-    public void deletePagesBySiteId(Long id) {
-        pageRepository.deletePagesBySiteId(id);
-        pageRepository.flush();
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<PageDto> findByPathAndSiteUrl(String pagePath, String siteUrl) {
-        return this.pageRepository.findByPathAndSiteUrl(pagePath, siteUrl).map(pageMapper::toDto);
     }
 }

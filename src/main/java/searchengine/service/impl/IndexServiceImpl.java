@@ -4,15 +4,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.mapper.CustomIndexMapper;
-import searchengine.mapper.IndexEntityMapper;
 import searchengine.model.entity.IndexEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
-import searchengine.model.entity.key.IndexEntityId;
 import searchengine.repository.IndexRepository;
 import searchengine.service.CompositeCRUDService;
-import searchengine.service.demo.SitePageServiceTest;
 
 import java.util.Optional;
 

@@ -3,6 +3,7 @@ package searchengine.service.demo;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
@@ -13,6 +14,7 @@ import searchengine.service.impl.SiteServiceImpl;
 @Service
 @RequiredArgsConstructor
 @Transactional
+@Slf4j
 public class SitePageServiceTest {
     @PersistenceContext
     private final EntityManager entityManager;
@@ -20,6 +22,7 @@ public class SitePageServiceTest {
     private final PageServiceImpl pageService;
 
     public PageDto savePage(PageDto pageDto) {
+        log.info("Сохраняем {}", pageDto.getPath());
         PageDto savedPage = pageService.save(pageDto);
         siteService.updateStatusTimeById(savedPage.getSite().getId());
         return savedPage;

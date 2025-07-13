@@ -12,6 +12,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.data.annotation.Version;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
@@ -41,4 +42,6 @@ public class SiteEntity {
     private Set<PageEntity> pages = new HashSet<>();
     @OneToMany(cascade = CascadeType.REMOVE)
     private Set<LemmaEntity> lemmas = new HashSet<>();
+    @Version
+    private Long version;
 }

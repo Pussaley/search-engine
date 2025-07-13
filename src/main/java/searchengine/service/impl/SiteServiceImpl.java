@@ -2,6 +2,9 @@ package searchengine.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.CannotAcquireLockException;
+import org.springframework.retry.annotation.Backoff;
+import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.SiteMapper;
@@ -13,7 +16,6 @@ import searchengine.service.CRUDService;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -61,24 +63,14 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
 
     }
 
-    public void updateNotIndexedEntities(SiteStatus status, CharSequence message) {
-        log.info("Обновляем статус сущностей");
-        Iterator<SiteDto> it = this.findNotIndexedSites().iterator();
-        while (it.hasNext()) {
-            SiteDto dto = it.next();
-            dto.setSiteStatus(status);
-            dto.setLastError(message.toString());
-            this.update(dto);
-        }
-    }
-
     @Override
     public void deleteById(Long id) {
         this.siteRepository.deleteById(id);
     }
 
-
-    public void updateStatusTimeById(Long id) {
+    @Retryable(value = CannotAcquireLockException.class,
+            backoff = @Backoff(delay = 100))
+    public synchronized void updateStatusTimeById(Long id) {
         siteRepository.updateStatusTimeById(LocalDateTime.now(), id);
     }
 
