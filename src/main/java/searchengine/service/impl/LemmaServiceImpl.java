@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import searchengine.mapper.LemmaEntityMapper;
+import searchengine.mapper.CustomLemmaMapper;
 import searchengine.model.entity.LemmaEntity;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.repository.LemmaRepository;
@@ -19,7 +19,7 @@ import java.util.Optional;
 public class LemmaServiceImpl implements CRUDService<LemmaDto> {
 
     private final LemmaRepository lemmaRepository;
-    private final LemmaEntityMapper lemmaMapper;
+    private final CustomLemmaMapper lemmaMapper;
 
     public LemmaEntity getReferenceById(Long lemmaId) {
         return lemmaRepository.getReferenceById(lemmaId);

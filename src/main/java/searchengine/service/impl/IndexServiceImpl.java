@@ -3,7 +3,7 @@ package searchengine.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-import searchengine.mapper.CustomIndexMapper;
+import searchengine.mapper.IndexEntityMapper;
 import searchengine.model.entity.IndexEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
@@ -19,7 +19,7 @@ import java.util.Optional;
 public class IndexServiceImpl implements CompositeCRUDService<IndexDto> {
 
     private final IndexRepository indexRepository;
-    private final CustomIndexMapper indexMapper;
+    private final IndexEntityMapper indexMapper;
 
     @Override
     public Optional<IndexDto> findById(Long id) {

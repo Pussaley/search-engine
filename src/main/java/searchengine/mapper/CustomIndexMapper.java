@@ -11,6 +11,7 @@ import searchengine.model.entity.key.IndexEntityId;
 import searchengine.service.impl.LemmaServiceImpl;
 import searchengine.service.impl.PageServiceImpl;
 
+
 @Component
 @RequiredArgsConstructor
 @Slf4j
@@ -29,14 +30,14 @@ public class CustomIndexMapper {
         indexEntity.setLemma(lemma);
         indexEntity.setRank(indexDto.getRank());
 
-        indexEntity.setId(new IndexEntityId(page.getId(), lemma.getId()));
+        indexEntity.setId(new IndexEntityId(page.getId(), indexDto.getLemmaId()));
 
         return indexEntity;
     }
     public IndexDto toDto(IndexEntity indexEntity) {
         return IndexDto.builder()
                 .pageId(indexEntity.getPage().getId())
-                .lemmaId(indexEntity.getLemma().getId())
+                .lemmaId(indexEntity.getId().getLemmaId())
                 .build();
     }
 }
