@@ -7,7 +7,15 @@ spring:
     password: TEST-skillbox
     url: jdbc:mysql://localhost:3306/test_search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true
     hikari:
-      transaction-isolation: TRANSACTION_READ_UNCOMMITTED
+      transaction-isolation: TRANSACTION_REPEATABLE_READ
+      maximum-pool-size: 20                   # Запас для пиков
+      minimum-idle: 5                         # Всегда 5 "разогретых" соединений
+      connection-timeout: 10000               # Ждать не дольше 10 сек (а не 30!)
+      leak-detection-threshold: 5000          # Утечки поймаем за 5 сек
+      max-lifetime: 1800000                   # Перерождаем соединения каждые 30 мин
+      idle-timeout: 600000                    # Закрываем бездельников через 10 мин
+      pool-name: "AntiExceptionPool"
+      initialization-fail-timeout: 1          # Не стартовать если БД недоступна
   jpa:
     show-sql: false
     hibernate:

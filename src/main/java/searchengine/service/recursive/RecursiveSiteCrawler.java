@@ -26,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveTask;
 import java.util.concurrent.locks.ReentrantLock;
@@ -145,7 +146,7 @@ public class RecursiveSiteCrawler extends RecursiveTask<Boolean> {
                         pageServiceTest,
                         false).fork();
             }
-            Arrays.stream(tasksArray).forEach(ForkJoinTask::join);
+            ForkJoinTask.invokeAll(tasksArray);
         } catch (SocketTimeoutException socketTimeoutException) {
             errorLogger(socketTimeoutException, this.url);
             errorSaving(RequestStatusCode.REQUEST_TIMEOUT);

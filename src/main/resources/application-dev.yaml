@@ -2,9 +2,9 @@ indexing-settings:
   sites:
 #    - url: https://www.svetlovka.ru
 #      name: svetlovka #1600 links
-    - url: https://sendel.ru
-      name: sendel #86
-#    - url: https://skillbox.ru
-#      name: skillbox # 25870 links
+#    - url: https://sendel.ru
+#      name: sendel #86
+    - url: https://skillbox.ru
+      name: skillbox # 25870 links
 #    - url: https://www.ipfran.ru
 #      name: ipfran # 1729 links

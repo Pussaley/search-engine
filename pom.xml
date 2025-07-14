@@ -11,6 +11,8 @@
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
         <maven.compiler.target>17</maven.compiler.target>
+        <dbcp.version>2.11.0</dbcp.version>
+        <lucene.morph.version>1.5</lucene.morph.version>
     </properties>
 
     <parent>
@@ -72,6 +74,11 @@
             <version>1.5.5.Final</version>
         </dependency>
         <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-dbcp2</artifactId>
+            <version>${dbcp.version}</version>
+        </dependency>
+        <dependency>
             <groupId>org.mapstruct</groupId>
             <artifactId>mapstruct-processor</artifactId>
             <version>1.5.5.Final</version>
@@ -80,27 +87,27 @@
         <dependency>
             <groupId>org.apache.lucene.morphology</groupId>
             <artifactId>morph</artifactId>
-            <version>1.5</version>
+            <version>${lucene.morph.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene.analysis</groupId>
             <artifactId>morphology</artifactId>
-            <version>1.5</version>
+            <version>${lucene.morph.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene.morphology</groupId>
             <artifactId>dictionary-reader</artifactId>
-            <version>1.5</version>
+            <version>${lucene.morph.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene.morphology</groupId>
             <artifactId>english</artifactId>
-            <version>1.5</version>
+            <version>${lucene.morph.version}</version>
         </dependency>
         <dependency>
             <groupId>org.apache.lucene.morphology</groupId>
             <artifactId>russian</artifactId>
-            <version>1.5</version>
+            <version>${lucene.morph.version}</version>
         </dependency>
     </dependencies>
 

@@ -17,12 +17,13 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
+@Transactional(timeout = 15)
 public class PageServiceImpl implements CRUDService<PageDto> {
 
     private final PageRepository pageRepository;
     private final PageMapper pageMapper;
 
+    @Transactional(readOnly = true)
     public PageEntity getReferenceById(Long pageId) {
         return pageRepository.getReferenceById(pageId);
     }
@@ -37,7 +38,7 @@ public class PageServiceImpl implements CRUDService<PageDto> {
     public List<PageDto> findByPath(String path) {
         return pageRepository.findByPath(path).stream().map(pageMapper::toDto).toList();
     }
-
+    @Transactional(readOnly = true)
     public Optional<PageDto> findByPathAndSiteId(String path, Long siteId) {
         return pageRepository.findByPathAndSiteId(path, siteId).map(pageMapper::toDto);
     }
@@ -55,7 +56,6 @@ public class PageServiceImpl implements CRUDService<PageDto> {
                 .orElseGet(() -> {
                     PageEntity entity = pageMapper.toEntity(pageDTO);
                     PageEntity saved = pageRepository.save(entity);
-                    pageRepository.flush();
                     return pageMapper.toDto(saved);
                 });
     }

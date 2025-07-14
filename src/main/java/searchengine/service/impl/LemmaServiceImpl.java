@@ -20,11 +20,11 @@ public class LemmaServiceImpl implements CRUDService<LemmaDto> {
 
     private final LemmaRepository lemmaRepository;
     private final LemmaEntityMapper lemmaMapper;
-
+    @Transactional(readOnly = true)
     public LemmaEntity getReferenceById(Long lemmaId) {
         return lemmaRepository.getReferenceById(lemmaId);
     }
-
+    @Transactional(readOnly = true)
     @Override
     public Optional<LemmaDto> findById(Long id) {
         return lemmaRepository.findById(id)
@@ -38,7 +38,7 @@ public class LemmaServiceImpl implements CRUDService<LemmaDto> {
 
         return lemmaMapper.toDto(saved);
     }
-
+    @Transactional(readOnly = true)
     public Optional<LemmaDto> findByLemmaAndSiteId(String lemma, Long siteId) {
         return lemmaRepository.findByLemmaAndSiteId(lemma, siteId).map(lemmaMapper::toDto);
     }

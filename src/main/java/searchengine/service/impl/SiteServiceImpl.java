@@ -29,12 +29,13 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
     private final SiteRepository siteRepository;
     private final SiteMapper siteMapper;
 
+    @Transactional(readOnly = true)
     @Override
     public Optional<SiteDto> findById(Long id) {
         return this.siteRepository.findById(id)
                 .map(siteMapper::toDTO);
     }
-
+    @Transactional(readOnly = true)
     public List<SiteDto> findNotIndexedSites() {
         List<SiteEntity> list = this.siteRepository.findSitesByStatusNotIndexed();
         return list.isEmpty() ? Collections.emptyList() : list.stream().map(siteMapper::toDTO).toList();
@@ -68,12 +69,10 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
         this.siteRepository.deleteById(id);
     }
 
-    @Retryable(value = CannotAcquireLockException.class,
-            backoff = @Backoff(delay = 100))
     public synchronized void updateStatusTimeById(Long id) {
         siteRepository.updateStatusTimeById(LocalDateTime.now(), id);
     }
-
+    @Transactional(readOnly = true)
     public Optional<SiteDto> findByName(String name) {
         return siteRepository.findByName(name).map(siteMapper::toDTO);
     }
