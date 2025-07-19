@@ -1,6 +1,7 @@
 package searchengine.service.impl;
 
 import lombok.RequiredArgsConstructor;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,9 +20,13 @@ import searchengine.util.jsoup.JSOUPParser;
 
 import java.net.URI;
 import java.text.MessageFormat;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
@@ -44,12 +49,78 @@ public class IndexingServiceImpl implements IndexingService<Response> {
     private final SitePageServiceTest sitePageServiceTest;
     private ForkJoinPool forkJoinPool;
     private ExecutorService executorService;
-    private final AtomicBoolean isRunning = new AtomicBoolean(false);
+    private final AtomicBoolean indexingIsRunning = new AtomicBoolean(false);
+    //----------------CF:
+    private final Map<String, CompletableFuture<?>> activeIndexingTasks = new ConcurrentHashMap<>();
+
+    @SneakyThrows
+    public boolean startIndexingCF() {
+        if (indexingIsRunning.compareAndSet(false, true)) {
+            for (Site site : sites.getSites()) {
+                CompletableFuture<?> future = CompletableFuture.supplyAsync(() -> {
+                            String siteUrl = site.getUrl();
+
+                            log.info("Очищаем БД от записей по сайту {}", siteUrl);
+                            sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
+
+                            log.info("Запускаем индексацию сайта {}.", siteUrl);
+                            return SiteDto.builder()
+                                    .statusTime(LocalDateTime.now())
+                                    .name(site.getName())
+                                    .lastError(null)
+                                    .url(siteUrl)
+                                    .siteStatus(SiteStatus.INDEXING)
+                                    .build();
+                        })
+                        .thenApply(siteService::save)
+                        .thenApply(savedSite -> {
+                            ForkJoinPool fjp = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+                            try {
+                                LocalDateTime started = LocalDateTime.now();
+                                log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), site.getName());
+                                fjp.invoke(new RecursiveSiteCrawler(savedSite,
+                                        site.getUrl(),
+                                        jsoupParser,
+                                        siteService,
+                                        pageService,
+                                        lemmaService,
+                                        indexService,
+                                        true));
+                                LocalDateTime ended = LocalDateTime.now();
+                                log.info("[Time: {}] - Индексация сайта {} завершена.", ended, site.getName());
+                                log.info("Длительность индексации: {} секунд", Duration.between(started, ended).toSeconds());
+                            } finally {
+                                fjp.shutdownNow();
+                                activeIndexingTasks.remove(site.getName());
+                            }
+                            return null;
+                        });
+                activeIndexingTasks.put(site.getName(), future);
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public boolean indexPageCF(String url) {
+
+        return true;
+    }
+
+    public boolean stopIndexingCF() {
+        activeIndexingTasks.values().forEach(future -> future.cancel(true));
+        log.info("Индексация остановлена");
+        return true;
+    }
 
     @Override
     public Response startIndexing() {
+        if (startIndexingCF())
+            return new ResponseSuccessMessageDto(true);
+        else
+            return new ResponseErrorMessageDto(false, "Индексация уже запущена");
 
-        if (isRunning.compareAndSet(false, true)) {
+/*        if (indexingIsRunning.compareAndSet(false, true)) {
             log.info("Запускаем индексацию.");
             List<Site> siteList = sites.getSites();
             initFJP();
@@ -96,20 +167,20 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                                         savedSite.setStatusTime(LocalDateTime.now());
                                         siteService.update(savedSite);
                                     }
-                                    isRunning.set(false);
+                                    indexingIsRunning.set(false);
                                 }
                             }
                     )
             ));
-            return new ResponseSuccessMessageDto(isRunning.get());
+            return new ResponseSuccessMessageDto(indexingIsRunning.get());
         } else {
             log.info("Индексация уже запущена");
             return new ResponseErrorMessageDto(false, "Индексация уже запущена");
-        }
+        }*/
     }
 
     public Response indexPage(String url) {
-        if (isRunning.get())
+        if (indexingIsRunning.get())
             return new ResponseErrorMessageDto(false,
                     "Индексация уже запущена");
         if (!isRelativePage(url))
@@ -118,7 +189,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         try {
             initFJP();
             initExecutorService(1);
-            isRunning.set(true);
+            indexingIsRunning.set(true);
             executorService.submit(() -> {
                 try {
                     for (Site site : sites.getSites()) {
@@ -150,7 +221,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                         }
                     }
                 } finally {
-                    isRunning.set(false);
+                    indexingIsRunning.set(false);
                 }
             });
         } catch (Exception exception) {
@@ -160,14 +231,14 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                             exception.getClass().getSimpleName(),
                             exception.getMessage()));
         }
-        return new ResponseSuccessMessageDto(isRunning.get());
+        return new ResponseSuccessMessageDto(indexingIsRunning.get());
     }
 
     @Override
     public Response stopIndexing() {
-        if (!isRunning.get()) {
+        if (!indexingIsRunning.get()) {
             log.info("Индексация не запущена");
-            return new ResponseErrorMessageDto(isRunning.get(), "Индексация не запущена");
+            return new ResponseErrorMessageDto(indexingIsRunning.get(), "Индексация не запущена");
         }
 
         int defaultTimeOut = concurrencyProperties.getShutdownTimeout();
@@ -193,7 +264,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             }
 
             siteService.updateAllSitesSiteStatus(SiteStatus.INDEXING, SiteStatus.FAILED);
-            isRunning.set(false);
+            indexingIsRunning.set(false);
             log.info("Индексация полностью остановлена");
         }
 

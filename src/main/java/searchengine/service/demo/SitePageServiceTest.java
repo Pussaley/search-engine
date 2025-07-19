@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.model.entity.dto.PageDto;
+import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.impl.PageServiceImpl;
 import searchengine.service.impl.SiteServiceImpl;
 
@@ -28,9 +29,9 @@ public class SitePageServiceTest {
         return savedPage;
     }
 
-    public void clearDatabaseFromSitePageLemmaIndexEntities(Site site) {
-        siteService.findByName(site.getName()).ifPresent( siteDto -> {
-            Long siteId = siteDto.getId();
+    public void clearDatabaseFromSitePageLemmaIndexEntities(String siteName) {
+        siteService.findByName(siteName).ifPresent(dto -> {
+            Long siteId = dto.getId();
             entityManager.createQuery("DELETE FROM IndexEntity AS i WHERE i.page.site.id = :siteId")
                     .setParameter("siteId", siteId)
                     .executeUpdate();
@@ -45,5 +46,13 @@ public class SitePageServiceTest {
 
             siteService.deleteById(siteId);
         });
+    }
+
+    public void clearDatabaseFromSitePageLemmaIndexEntities(SiteDto siteDto) {
+        clearDatabaseFromSitePageLemmaIndexEntities(siteDto.getName());
+    }
+
+    public void clearDatabaseFromSitePageLemmaIndexEntities(Site site) {
+        clearDatabaseFromSitePageLemmaIndexEntities(site.getName());
     }
 }
