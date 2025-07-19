@@ -32,7 +32,7 @@ public class PageEntity {
     private String path;
     @Column(name = "code", nullable = false)
     private Integer code;
-    @Column(name = "content", columnDefinition = "LONGTEXT", nullable = false)
+    @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
