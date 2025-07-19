@@ -1,5 +1,7 @@
 package searchengine.service.impl;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -11,7 +13,6 @@ import searchengine.repository.PageRepository;
 import searchengine.service.CRUDService;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.Optional;
 
 @Service
@@ -20,8 +21,10 @@ import java.util.Optional;
 @Transactional
 public class PageServiceImpl implements CRUDService<PageDto> {
 
-    private final PageRepository pageRepository;
     private final PageMapper pageMapper;
+    private final PageRepository pageRepository;
+    @PersistenceContext
+    private final EntityManager entityManager;
 
     public PageEntity getReferenceById(Long pageId) {
         return pageRepository.getReferenceById(pageId);
@@ -48,15 +51,8 @@ public class PageServiceImpl implements CRUDService<PageDto> {
     }
 
     public PageDto save(PageDto pageDTO) {
-        return findByPath(pageDTO.getPath())
-                .stream()
-                .filter(el -> Objects.equals(el.getSite().getId(), pageDTO.getSite().getId()))
-                .findFirst()
-                .orElseGet(() -> {
-                    PageEntity entity = pageMapper.toEntity(pageDTO);
-                    PageEntity saved = pageRepository.save(entity);
-                    pageRepository.flush();
-                    return pageMapper.toDto(saved);
-                });
+        PageEntity pageEntity = pageMapper.toEntity(pageDTO);
+        PageEntity savedPage = pageRepository.save(pageEntity);
+        return pageMapper.toDto(savedPage);
     }
 }
