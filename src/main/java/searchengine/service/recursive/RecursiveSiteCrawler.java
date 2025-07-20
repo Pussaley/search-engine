@@ -23,7 +23,6 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
 import java.util.concurrent.locks.ReentrantLock;
@@ -39,7 +38,6 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private final PageServiceImpl pageService;
     private final LemmaServiceImpl lemmaService;
     private final IndexServiceImpl indexService;
-    @Getter
     @Setter
     private static volatile boolean cancelRecursiveTask = false;
     @Getter
@@ -48,7 +46,6 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private static final Set<String> parsedPages = ConcurrentHashMap.newKeySet();
     private static final Map<String, ReentrantLock> PAGE_LOCKS = new ConcurrentHashMap<>();
     private static final Map<String, ReentrantLock> LEMMA_LOCKS = new ConcurrentHashMap<>();
-    private static final Object LOCK_CREATION_MONITOR = new Object();
 
     public RecursiveSiteCrawler(SiteDto siteDto, String url, JSOUPParser jsoupParser, SiteServiceImpl siteService, PageServiceImpl pageService, LemmaServiceImpl lemmaService, IndexServiceImpl indexService) {
         this(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, true);
@@ -94,8 +91,8 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     @Override
     protected void compute() {
 
-        if (cancelRecursiveTask) {
-            cancel(true);
+        if (Thread.currentThread().isInterrupted() || cancelRecursiveTask) {
+            log.debug("Произошло прерывание индексации ...");
             return;
         }
 
@@ -124,19 +121,29 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                             processLemmas(savedPage);
                             return pageDto;
                         });
+                RecursiveSiteCrawler[] tasksList = new RecursiveSiteCrawler[pages.size()];
+                int p = 0;
+                for (String page : pages) {
+                    if (Thread.interrupted())
+                        throw new InterruptedException();
+
+                    tasksList[p++] = new RecursiveSiteCrawler(
+                            siteDto,
+                            page,
+                            jsoupParser,
+                            siteService,
+                            pageService,
+                            lemmaService,
+                            indexService,
+                            false);
+                }
+                ForkJoinTask.invokeAll(tasksList);
             } finally {
-                RecursiveSiteCrawler[] tasks = pages.stream().map(p -> new RecursiveSiteCrawler(
-                        siteDto,
-                        p,
-                        jsoupParser,
-                        siteService,
-                        pageService,
-                        lemmaService,
-                        indexService,
-                        false)).toArray(RecursiveSiteCrawler[]::new);
-                ForkJoinTask.invokeAll(tasks);
                 pageLock.unlock();
             }
+        } catch (InterruptedException interruptedException) {
+            Thread.currentThread().interrupt();
+            log.warn("Индексация была прервана.");
         } catch (SocketTimeoutException socketTimeoutException) {
             errorLogger(socketTimeoutException, this.url);
             errorSaving(RequestStatusCode.REQUEST_TIMEOUT);

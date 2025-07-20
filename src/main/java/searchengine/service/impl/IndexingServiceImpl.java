@@ -18,17 +18,13 @@ import searchengine.service.demo.SitePageServiceTest;
 import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
 
-import java.net.URI;
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -47,244 +43,120 @@ public class IndexingServiceImpl implements IndexingService<Response> {
     private final LemmaServiceImpl lemmaService;
     private final IndexServiceImpl indexService;
     private final SitePageServiceTest sitePageServiceTest;
-    private ForkJoinPool forkJoinPool;
-    private ExecutorService executorService;
     private final AtomicBoolean indexingIsRunning = new AtomicBoolean(false);
-    //----------------CF:
     private final Map<String, CompletableFuture<?>> activeIndexingTasks = new ConcurrentHashMap<>();
-
-    @SneakyThrows
-    public boolean startIndexingCF() {
-        if (indexingIsRunning.compareAndSet(false, true)) {
-            for (Site site : sites.getSites()) {
-                CompletableFuture<?> future = CompletableFuture.supplyAsync(() -> {
-                            String siteUrl = site.getUrl();
-
-                            log.info("Очищаем БД от записей по сайту {}", siteUrl);
-                            sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
-
-                            log.info("Запускаем индексацию сайта {}.", siteUrl);
-                            return SiteDto.builder()
-                                    .statusTime(LocalDateTime.now())
-                                    .name(site.getName())
-                                    .lastError(null)
-                                    .url(siteUrl)
-                                    .siteStatus(SiteStatus.INDEXING)
-                                    .build();
-                        })
-                        .thenApply(siteService::save)
-                        .thenApply(savedSite -> {
-                            ForkJoinPool fjp = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
-                            try {
-                                LocalDateTime started = LocalDateTime.now();
-                                log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), site.getName());
-                                fjp.invoke(new RecursiveSiteCrawler(savedSite,
-                                        site.getUrl(),
-                                        jsoupParser,
-                                        siteService,
-                                        pageService,
-                                        lemmaService,
-                                        indexService,
-                                        true));
-                                LocalDateTime ended = LocalDateTime.now();
-                                log.info("[Time: {}] - Индексация сайта {} завершена.", ended, site.getName());
-                                log.info("Длительность индексации: {} секунд", Duration.between(started, ended).toSeconds());
-                            } finally {
-                                fjp.shutdownNow();
-                                activeIndexingTasks.remove(site.getName());
-                            }
-                            return null;
-                        });
-                activeIndexingTasks.put(site.getName(), future);
-            }
-            return true;
-        }
-        return false;
-    }
-
-    public boolean indexPageCF(String url) {
-
-        return true;
-    }
-
-    public boolean stopIndexingCF() {
-        activeIndexingTasks.values().forEach(future -> future.cancel(true));
-        log.info("Индексация остановлена");
-        return true;
-    }
+    private final Map<String, ForkJoinPool> activeForkJoinPools = new ConcurrentHashMap<>();
 
     @Override
     public Response startIndexing() {
-        if (startIndexingCF())
-            return new ResponseSuccessMessageDto(true);
-        else
-            return new ResponseErrorMessageDto(false, "Индексация уже запущена");
-
-/*        if (indexingIsRunning.compareAndSet(false, true)) {
+        if (indexingIsRunning.compareAndSet(false, true)) {
             log.info("Запускаем индексацию.");
-            List<Site> siteList = sites.getSites();
-            initFJP();
-            initExecutorService(siteList.size());
+            sites.getSites().forEach(this::indexingSite);
 
-            executorService.submit(() -> siteList.forEach(site -> executorService.submit(
-                            () -> {
-                                SiteDto savedSite = null;
-                                SiteDto siteDto = SiteDto.builder()
-                                        .siteStatus(SiteStatus.INDEXING)
-                                        .statusTime(LocalDateTime.now())
-                                        .name(site.getName())
-                                        .url(site.getUrl())
-                                        .lastError(null)
-                                        .build();
+            CompletableFuture<?>[] futures = activeIndexingTasks.values()
+                    .toArray(CompletableFuture[]::new);
 
-                                try {
-                                    sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
-                                    log.info("Очищение базы успешно завершено");
+            CompletableFuture.allOf(futures)
+                    .whenCompleteAsync((res, ex) -> {
+                        if (Objects.nonNull(ex)) {
+                            if (ex instanceof CancellationException)
+                                log.info("Индексация была отменена пользователем.");
+                            else
+                                log.error("Индексация завершена с ошибкой: {}.", ex.getMessage());
+                        }
+                        indexingIsRunning.set(false);
+                    });
 
-                                    savedSite = siteService.save(siteDto);
+            return new ResponseSuccessMessageDto(true);
+        }
+        return new ResponseErrorMessageDto(false, "Индексация уже запущена");
+    }
 
-                                    log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), site.getName());
-                                    forkJoinPool.invoke(new RecursiveSiteCrawler(savedSite,
-                                            site.getUrl(),
-                                            jsoupParser,
-                                            siteService,
-                                            pageService,
-                                            lemmaService,
-                                            indexService,
-                                            true));
-                                    log.info("Индексация сайта {} завершена.", site.getName());
+    private void indexingSite(Site site) {
+        CompletableFuture<SiteStatus> future = CompletableFuture
+                .supplyAsync(() -> prepareSiteForIndexing(site))
+                .thenApply(siteService::save)
+                .thenApply(savedSite -> {
+                    ForkJoinPool fjp = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+                    SiteStatus result = savedSite.getSiteStatus();
+                    activeForkJoinPools.put(site.getName(), fjp);
+                    try {
+                        LocalDateTime started = LocalDateTime.now();
+                        log.info("[Time: {}] - Запущена индексация сайта {}.", started, site.getName());
+                        fjp.invoke(new RecursiveSiteCrawler(savedSite,
+                                site.getUrl(),
+                                jsoupParser,
+                                siteService,
+                                pageService,
+                                lemmaService,
+                                indexService));
+                        LocalDateTime ended = LocalDateTime.now();
+                        log.info("[Time: {}] - Индексация сайта {} завершена.", ended, site.getName());
+                        log.info("Длительность индексации: {} секунд.", Duration.between(started, ended).toSeconds());
+                    } finally {
+                        fjp.shutdownNow();
+                        activeIndexingTasks.remove(site.getName());
+                    }
+                    return result;
+                });
+        activeIndexingTasks.put(site.getName(), future);
+    }
 
-                                    savedSite.setSiteStatus(SiteStatus.INDEXED);
-                                } catch (Exception exception) {
-                                    if (Objects.nonNull(savedSite)) {
-                                        savedSite.setLastError(exception.getMessage());
-                                        savedSite.setSiteStatus(SiteStatus.FAILED);
-                                    }
-                                    log.error("Исключение {} во время индексации сайта {}", exception.getClass().getSimpleName(), site.getName());
-                                    exception.printStackTrace();
-                                } finally {
-                                    if (Objects.nonNull(savedSite)) {
-                                        savedSite.setStatusTime(LocalDateTime.now());
-                                        siteService.update(savedSite);
-                                    }
-                                    indexingIsRunning.set(false);
-                                }
-                            }
-                    )
-            ));
-            return new ResponseSuccessMessageDto(indexingIsRunning.get());
-        } else {
-            log.info("Индексация уже запущена");
-            return new ResponseErrorMessageDto(false, "Индексация уже запущена");
-        }*/
+    private SiteDto prepareSiteForIndexing(Site site) {
+        String siteUrl = site.getUrl();
+
+        log.info("Очищаем БД от записей по сайту {}.", siteUrl);
+        sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
+
+        return SiteDto.builder()
+                .statusTime(LocalDateTime.now())
+                .name(site.getName())
+                .lastError(null)
+                .url(siteUrl)
+                .siteStatus(SiteStatus.INDEXING)
+                .build();
+    }
+
+    @SneakyThrows
+    @Override
+    public Response stopIndexing() {
+
+        log.warn("Попытка остановить индексацию.");
+
+        if (!indexingIsRunning.get())
+            return new ResponseErrorMessageDto(false, "Индексация не запущена.");
+
+        activeIndexingTasks.values().forEach(f -> f.cancel(true));
+        activeForkJoinPools.forEach((siteName, forkJoinPool) -> {
+            if (!forkJoinPool.isTerminated() && !forkJoinPool.isTerminating()) {
+                forkJoinPool.shutdownNow();
+                try {
+                    if (!forkJoinPool.awaitTermination(concurrencyProperties.getShutdownTimeout(), TimeUnit.SECONDS)) {
+                        log.warn("Индексация не остановилась! Повторная попытка прерывания индексации.");
+                        forkJoinPool.shutdownNow();
+                        forkJoinPool.awaitTermination(concurrencyProperties.getShutdownTimeout() * 2L, TimeUnit.SECONDS);
+                    }
+                } catch (InterruptedException interruptedException) {
+                    Thread.currentThread().interrupt();
+                }
+            }
+        });
+
+        activeForkJoinPools.clear();
+        activeIndexingTasks.clear();
+        System.gc();
+        indexingIsRunning.set(false);
+
+        log.info("Индексация завершилась");
+
+        return new ResponseSuccessMessageDto(true);
     }
 
     public Response indexPage(String url) {
         if (indexingIsRunning.get())
             return new ResponseErrorMessageDto(false,
                     "Индексация уже запущена");
-        if (!isRelativePage(url))
-            return new ResponseErrorMessageDto(false, "Данная страница находится за пределами сайтов, указанных в конфигурационном файле");
-
-        try {
-            initFJP();
-            initExecutorService(1);
-            indexingIsRunning.set(true);
-            executorService.submit(() -> {
-                try {
-                    for (Site site : sites.getSites()) {
-                        if (url.contains(site.getUrl())) {
-                            sitePageServiceTest.clearDatabaseFromSitePageLemmaIndexEntities(site);
-                            log.info("Очищение базы успешно завершено");
-                            SiteDto siteDto = SiteDto.builder()
-                                    .siteStatus(SiteStatus.INDEXING)
-                                    .statusTime(LocalDateTime.now())
-                                    .name(site.getName())
-                                    .url(site.getUrl())
-                                    .lastError("")
-                                    .build();
-
-                            SiteDto savedSiteDto = siteService.save(siteDto);
-                            log.info("[Time: {}] - Запущена индексация сайта {}.", LocalDateTime.now(), savedSiteDto.getName());
-                            forkJoinPool.invoke(new RecursiveSiteCrawler(
-                                    savedSiteDto,
-                                    url,
-                                    jsoupParser,
-                                    siteService,
-                                    pageService,
-                                    lemmaService,
-                                    indexService));
-                            log.info("Индексация сайта {} завершена.", site.getName());
-
-                            savedSiteDto.setSiteStatus(SiteStatus.INDEXED);
-                            siteService.update(savedSiteDto);
-                        }
-                    }
-                } finally {
-                    indexingIsRunning.set(false);
-                }
-            });
-        } catch (Exception exception) {
-            log.info(exception.getClass().getSimpleName());
-            return new ResponseErrorMessageDto(false,
-                    MessageFormat.format("Неизвестная ошибка: {0}. Message: {1}",
-                            exception.getClass().getSimpleName(),
-                            exception.getMessage()));
-        }
-        return new ResponseSuccessMessageDto(indexingIsRunning.get());
-    }
-
-    @Override
-    public Response stopIndexing() {
-        if (!indexingIsRunning.get()) {
-            log.info("Индексация не запущена");
-            return new ResponseErrorMessageDto(indexingIsRunning.get(), "Индексация не запущена");
-        }
-
-        int defaultTimeOut = concurrencyProperties.getShutdownTimeout();
-
-        boolean terminated = false;
-        try {
-            forkJoinPool.shutdownNow();
-            log.info("Индексация была остановлена пользователем");
-            terminated = forkJoinPool.awaitTermination(defaultTimeOut, TimeUnit.SECONDS);
-        } catch (InterruptedException e) {
-            log.info("Ожидание завершения работы ForkJoinPool'а было прервано <{}>", e.getMessage());
-            Thread.currentThread().interrupt();
-        } finally {
-            if (!forkJoinPool.isTerminated() || !terminated) {
-                try {
-                    log.info("Повторная попытка завершить индексацию");
-                    forkJoinPool.shutdownNow();
-                    forkJoinPool.awaitTermination(defaultTimeOut, TimeUnit.SECONDS);
-                } catch (InterruptedException e) {
-                    log.info("Повторная попытка завершить индексацию была прервана");
-                    Thread.currentThread().interrupt();
-                }
-            }
-
-            siteService.updateAllSitesSiteStatus(SiteStatus.INDEXING, SiteStatus.FAILED);
-            indexingIsRunning.set(false);
-            log.info("Индексация полностью остановлена");
-        }
 
         return new ResponseSuccessMessageDto(true);
-    }
-
-    private boolean isRelativePage(String url) {
-        URI uri = URI.create(url);
-        return sites.getSites().stream().anyMatch(site -> site.getUrl().contains(uri.getScheme().concat("://").concat(uri.getHost())));
-    }
-
-    private void initFJP() {
-        if (forkJoinPool == null || forkJoinPool.isShutdown()) {
-            forkJoinPool = new ForkJoinPool();
-        }
-    }
-
-    private void initExecutorService(int size) {
-        if (executorService == null || executorService.isShutdown()) {
-            executorService = Executors.newFixedThreadPool(size);
-        }
     }
 }

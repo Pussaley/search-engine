@@ -20,14 +20,6 @@ public class SitePageServiceTest {
     @PersistenceContext
     private final EntityManager entityManager;
     private final SiteServiceImpl siteService;
-    private final PageServiceImpl pageService;
-
-    public PageDto savePage(PageDto pageDto) {
-        log.info("Сохраняем {}", pageDto.getPath());
-        PageDto savedPage = pageService.save(pageDto);
-        siteService.updateStatusTimeById(savedPage.getSite().getId());
-        return savedPage;
-    }
 
     public void clearDatabaseFromSitePageLemmaIndexEntities(String siteName) {
         siteService.findByName(siteName).ifPresent(dto -> {
