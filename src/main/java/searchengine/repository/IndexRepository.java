@@ -7,6 +7,7 @@ import org.springframework.stereotype.Repository;
 import searchengine.model.entity.IndexEntity;
 import searchengine.model.entity.key.IndexEntityId;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -26,6 +27,18 @@ public interface IndexRepository extends JpaRepository<IndexEntity, IndexEntityI
     @Modifying
     @Query(
             nativeQuery = true,
-            value = "delete from indexes as i where lemma_id = ? and page_id = ?")
+            value = "delete from indexes as i where i.lemma_id = ? and i.page_id = ?")
     void deleteByLemmaIdAndPageId(Long lemmaId, Long pageId);
+
+    @Query(
+            nativeQuery = true,
+            value = "select count(*) from indexes as i where i.page_id = ?"
+    )
+    Integer countIndexEntitiesByPageId(Long pageId);
+
+    @Query(
+            nativeQuery = true,
+            value = "select * from indexes as i where i.page_id = ?"
+    )
+    List<IndexEntity> findAllByPageId(Long pageId);
 }

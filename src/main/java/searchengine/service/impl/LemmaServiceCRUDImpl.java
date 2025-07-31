@@ -15,8 +15,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
-public class LemmaServiceImpl implements CRUDService<LemmaDto> {
+@Transactional(timeout = 15)
+public class LemmaServiceCRUDImpl implements CRUDService<LemmaDto> {
 
     private final LemmaRepository lemmaRepository;
     private final LemmaEntityMapper lemmaMapper;
@@ -46,5 +46,9 @@ public class LemmaServiceImpl implements CRUDService<LemmaDto> {
     @Override
     public void deleteById(Long id) {
         lemmaRepository.deleteById(id);
+    }
+
+    public void updateLemmaFrequency(Integer amount, Long lemmaId) {
+        lemmaRepository.updateLemmaFrequency(amount, lemmaId);
     }
 }

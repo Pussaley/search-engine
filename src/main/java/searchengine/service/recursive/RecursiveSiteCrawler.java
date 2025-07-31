@@ -6,22 +6,24 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
+import searchengine.config.Site;
+import searchengine.exception.SiteNotIndexedException;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
-import searchengine.service.impl.IndexServiceImpl;
-import searchengine.service.impl.LemmaServiceImpl;
-import searchengine.service.impl.PageServiceImpl;
-import searchengine.service.impl.SiteServiceImpl;
+import searchengine.service.impl.IndexServiceCRUDImpl;
+import searchengine.service.impl.LemmaServiceCRUDImpl;
+import searchengine.service.impl.PageServiceCRUDImpl;
+import searchengine.service.impl.SiteServiceCRUDImpl;
 import searchengine.service.morphology.LemmaFinder;
 import searchengine.util.jsoup.JSOUPParser;
 
-import java.io.IOException;
 import java.net.SocketTimeoutException;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ForkJoinTask;
 import java.util.concurrent.RecursiveAction;
@@ -34,10 +36,11 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private final SiteDto siteDto;
     private final String url;
     private final JSOUPParser jsoupParser;
-    private final SiteServiceImpl siteService;
-    private final PageServiceImpl pageService;
-    private final LemmaServiceImpl lemmaService;
-    private final IndexServiceImpl indexService;
+    private final SiteServiceCRUDImpl siteService;
+    private final PageServiceCRUDImpl pageService;
+    private final LemmaServiceCRUDImpl lemmaService;
+    private final IndexServiceCRUDImpl indexService;
+    private final LemmaFinder lemmaFinder;
     @Setter
     private static volatile boolean cancelRecursiveTask = false;
     @Getter
@@ -47,17 +50,25 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private static final Map<String, ReentrantLock> PAGE_LOCKS = new ConcurrentHashMap<>();
     private static final Map<String, ReentrantLock> LEMMA_LOCKS = new ConcurrentHashMap<>();
 
-    public RecursiveSiteCrawler(SiteDto siteDto, String url, JSOUPParser jsoupParser, SiteServiceImpl siteService, PageServiceImpl pageService, LemmaServiceImpl lemmaService, IndexServiceImpl indexService) {
-        this(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, true);
+    public RecursiveSiteCrawler(SiteDto siteDto,
+                                String url,
+                                JSOUPParser jsoupParser,
+                                SiteServiceCRUDImpl siteService,
+                                PageServiceCRUDImpl pageService,
+                                LemmaServiceCRUDImpl lemmaService,
+                                IndexServiceCRUDImpl indexService,
+                                LemmaFinder lemmaFinder) {
+        this(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, lemmaFinder, false);
     }
 
     public RecursiveSiteCrawler(SiteDto siteDto,
                                 String url,
                                 JSOUPParser jsoupParser,
-                                SiteServiceImpl siteService,
-                                PageServiceImpl pageService,
-                                LemmaServiceImpl lemmaService,
-                                IndexServiceImpl indexService,
+                                SiteServiceCRUDImpl siteService,
+                                PageServiceCRUDImpl pageService,
+                                LemmaServiceCRUDImpl lemmaService,
+                                IndexServiceCRUDImpl indexService,
+                                LemmaFinder lemmaFinder,
                                 boolean newIndexing) {
         this.siteDto = siteDto;
         this.url = url;
@@ -66,6 +77,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         this.pageService = pageService;
         this.lemmaService = lemmaService;
         this.indexService = indexService;
+        this.lemmaFinder = lemmaFinder;
         this.newIndexing = newIndexing;
 
         if (newIndexing)
@@ -90,10 +102,11 @@ public class RecursiveSiteCrawler extends RecursiveAction {
 
     @Override
     protected void compute() {
-
         if (Thread.currentThread().isInterrupted() || cancelRecursiveTask) {
-            log.debug("Произошло прерывание индексации ...");
-            return;
+            Site site = new Site();
+            site.setName(siteDto.getName());
+            site.setUrl(siteDto.getUrl());
+            throw new SiteNotIndexedException(site, "Индексация отменена пользователем");
         }
 
         try {
@@ -108,7 +121,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             String rawPath = this.url.replaceFirst(siteDto.getUrl(), "");
 
             ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(rawPath, k -> new ReentrantLock());
-            pageLock.lock();
+            pageLock.lockInterruptibly();
             try {
                 pageService.findByPathAndSiteId(rawPath, siteDto.getId())
                         .orElseGet(() -> {
@@ -118,9 +131,10 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                                     .path(rawPath)
                                     .code(statusCode).build();
                             PageDto savedPage = pageService.save(pageDto);
-                            processLemmas(savedPage);
+                            processLemmas(siteDto, savedPage);
                             return pageDto;
                         });
+
                 RecursiveSiteCrawler[] tasksList = new RecursiveSiteCrawler[pages.size()];
                 int p = 0;
                 for (String page : pages) {
@@ -135,7 +149,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                             pageService,
                             lemmaService,
                             indexService,
-                            false);
+                            lemmaFinder);
                 }
                 ForkJoinTask.invokeAll(tasksList);
             } finally {
@@ -143,28 +157,25 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             }
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
-            log.warn("Индексация была прервана.");
+            throw new CancellationException("Индексация была отменена пользователем");
         } catch (SocketTimeoutException socketTimeoutException) {
             errorLogger(socketTimeoutException, this.url);
             errorSaving(RequestStatusCode.REQUEST_TIMEOUT);
         } catch (HttpStatusException httpStatusException) {
             errorLogger(httpStatusException, httpStatusException.getUrl());
             errorSaving(RequestStatusCode.NOT_FOUND);
+        } catch (CancellationException cancellationException) {
+            Site site = new Site();
+            site.setName(siteDto.getName());
+            site.setUrl(siteDto.getUrl());
+            throw new SiteNotIndexedException(site, "Индексация отменена пользователем");
         } catch (Exception exception) {
             errorLogger(exception, this.url);
             errorSaving(RequestStatusCode.REQUEST_DENIED);
         }
     }
 
-    private void processLemmas(PageDto page) {
-        LemmaFinder lemmaFinder;
-        try {
-            lemmaFinder = LemmaFinder.getInstance();
-        } catch (IOException e) {
-            log.error("Ошибка при создании лемматизатора");
-            return;
-        }
-
+    public void processLemmas(SiteDto site, PageDto page) {
         Map<String, Integer> lemmas = lemmaFinder.collectLemmas(page.getContent());
         for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
             String lemma = entry.getKey();
@@ -174,27 +185,33 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                 lemmaLock = LEMMA_LOCKS.computeIfAbsent(lemma, k -> new ReentrantLock());
             }
 
-            lemmaLock.lock();
-            Integer lemmaCount = entry.getValue();
             try {
-                LemmaDto lemmaDto = lemmaService.findByLemmaAndSiteId(lemma, siteDto.getId())
-                        .orElseGet(() -> LemmaDto.builder()
-                                .lemma(lemma)
-                                .site(siteDto)
-                                .frequency(0)
-                                .build());
+                lemmaLock.lockInterruptibly();
+                Integer lemmaCount = entry.getValue();
+                try {
+                    LemmaDto lemmaDto = lemmaService.findByLemmaAndSiteId(lemma, site.getId())
+                            .orElseGet(() -> LemmaDto.builder()
+                                    .lemma(lemma)
+                                    .site(site)
+                                    .frequency(0)
+                                    .build());
 
-                lemmaDto.setFrequency(lemmaDto.getFrequency() + 1);
-                LemmaDto savedLemma = lemmaService.save(lemmaDto);
+                    lemmaDto.setFrequency(lemmaDto.getFrequency() + 1);
+                    LemmaDto savedLemma = lemmaService.save(lemmaDto);
 
-                indexService.findByPageAndLemma(page, savedLemma).orElseGet(() ->
-                        indexService.save(IndexDto.builder()
-                                .pageId(page.getId())
-                                .lemmaId(savedLemma.getId())
-                                .rank(lemmaCount.floatValue())
-                                .build()));
-            } finally {
-                lemmaLock.unlock();
+                    indexService.findByPageAndLemma(page, savedLemma).orElseGet(() ->
+                            indexService.save(IndexDto.builder()
+                                    .pageId(page.getId())
+                                    .lemmaId(savedLemma.getId())
+                                    .rank(lemmaCount.floatValue())
+                                    .build()));
+                } finally {
+                    lemmaLock.unlock();
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                log.warn("Поток прерван, завершаем транзакцию и освобождаем соединение");
+                throw new CancellationException("Индексация была прервана пользователем");
             }
         }
     }
@@ -206,7 +223,6 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private void errorSaving(RequestStatusCode statusCode) {
         String rawPath = this.url.replaceFirst(siteDto.getUrl(), "");
         ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(rawPath, k -> new ReentrantLock());
-
         pageLock.lock();
         try {
             PageDto errorDto = PageDto.builder()

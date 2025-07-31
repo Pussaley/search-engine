@@ -7,10 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
-import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
-import searchengine.service.impl.PageServiceImpl;
-import searchengine.service.impl.SiteServiceImpl;
+import searchengine.service.impl.SiteServiceCRUDImpl;
 
 @Service
 @RequiredArgsConstructor
@@ -19,7 +17,7 @@ import searchengine.service.impl.SiteServiceImpl;
 public class SitePageServiceTest {
     @PersistenceContext
     private final EntityManager entityManager;
-    private final SiteServiceImpl siteService;
+    private final SiteServiceCRUDImpl siteService;
 
     public void clearDatabaseFromSitePageLemmaIndexEntities(String siteName) {
         siteService.findByName(siteName).ifPresent(dto -> {

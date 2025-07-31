@@ -1,70 +1,108 @@
 package searchengine.service.impl;
 
-import lombok.RequiredArgsConstructor;
 import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
+import org.jsoup.Connection;
+import org.jsoup.nodes.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.config.props.concurrency.ConcurrencyProperties;
+import searchengine.exception.SiteNotIndexedException;
 import searchengine.model.SiteStatus;
 import searchengine.model.dto.response.Response;
 import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
 import searchengine.model.dto.response.demo.ResponseSuccessMessageDto;
+import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.IndexingService;
 import searchengine.service.demo.SitePageServiceTest;
+import searchengine.service.morphology.LemmaFinder;
 import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
 
+import java.net.URI;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.CancellationException;
+import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 import java.util.concurrent.ForkJoinPool;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Service
 @Slf4j
-@RequiredArgsConstructor
-@Transactional
 public class IndexingServiceImpl implements IndexingService<Response> {
 
     private final JSOUPParser jsoupParser;
     private final ConcurrencyProperties concurrencyProperties;
     private final SitesList sites;
-    private final SiteServiceImpl siteService;
-    private final PageServiceImpl pageService;
-    private final LemmaServiceImpl lemmaService;
-    private final IndexServiceImpl indexService;
+    private final SiteServiceCRUDImpl siteService;
+    private final PageServiceCRUDImpl pageService;
+    private final IndexServiceCRUDImpl indexService;
     private final SitePageServiceTest sitePageServiceTest;
+    private final LemmaServiceCRUDImpl lemmaService;
+    private final LemmaFinder lemmaFinder;
+    private final ExecutorService defaultIndexingExecutor;
     private final AtomicBoolean indexingIsRunning = new AtomicBoolean(false);
     private final Map<String, CompletableFuture<?>> activeIndexingTasks = new ConcurrentHashMap<>();
     private final Map<String, ForkJoinPool> activeForkJoinPools = new ConcurrentHashMap<>();
 
+    public IndexingServiceImpl(JSOUPParser jsoupParser,
+                               ConcurrencyProperties concurrencyProperties,
+                               SitesList sites,
+                               SiteServiceCRUDImpl siteService,
+                               PageServiceCRUDImpl pageService,
+                               IndexServiceCRUDImpl indexService,
+                               SitePageServiceTest sitePageServiceTest,
+                               LemmaServiceCRUDImpl lemmaService,
+                               LemmaFinder lemmaFinder) {
+        this.jsoupParser = jsoupParser;
+        this.concurrencyProperties = concurrencyProperties;
+        this.sites = sites;
+        this.siteService = siteService;
+        this.pageService = pageService;
+        this.indexService = indexService;
+        this.sitePageServiceTest = sitePageServiceTest;
+        this.lemmaService = lemmaService;
+        this.lemmaFinder = lemmaFinder;
+        this.defaultIndexingExecutor = Executors.newFixedThreadPool(sites.getSites().size());
+    }
+
     @Override
+    @Transactional
     public Response startIndexing() {
         if (indexingIsRunning.compareAndSet(false, true)) {
             log.info("Запускаем индексацию.");
-            sites.getSites().forEach(this::indexingSite);
 
-            CompletableFuture<?>[] futures = activeIndexingTasks.values()
+            CompletableFuture[] futures = sites.getSites()
+                    .stream()
+                    .map(site ->
+                            oneMethodAsync(site, site.getUrl())
+                                    .whenCompleteAsync((res, ex) -> {
+                                        if (Objects.nonNull(ex))
+                                            handleSiteIndexingError(ex, site.getUrl());
+                                        else {
+                                            siteService.findByName(site.getName())
+                                                    .ifPresent(siteDto -> {
+                                                        siteDto.setStatusTime(LocalDateTime.now());
+                                                        siteDto.setSiteStatus(SiteStatus.INDEXED);
+                                                        siteService.update(siteDto);
+                                                    });
+                                        }
+                                    }, defaultIndexingExecutor))
                     .toArray(CompletableFuture[]::new);
 
             CompletableFuture.allOf(futures)
-                    .whenCompleteAsync((res, ex) -> {
-                        if (Objects.nonNull(ex)) {
-                            if (ex instanceof CancellationException)
-                                log.info("Индексация была отменена пользователем.");
-                            else
-                                log.error("Индексация завершена с ошибкой: {}.", ex.getMessage());
-                        }
+                    .whenComplete((res, ex) -> {
                         indexingIsRunning.set(false);
+                        log.info("Индексация всех сайтов завершена.");
                     });
 
             return new ResponseSuccessMessageDto(true);
@@ -72,34 +110,129 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         return new ResponseErrorMessageDto(false, "Индексация уже запущена");
     }
 
-    private void indexingSite(Site site) {
-        CompletableFuture<SiteStatus> future = CompletableFuture
-                .supplyAsync(() -> prepareSiteForIndexing(site))
-                .thenApply(siteService::save)
-                .thenApply(savedSite -> {
-                    ForkJoinPool fjp = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
-                    SiteStatus result = savedSite.getSiteStatus();
-                    activeForkJoinPools.put(site.getName(), fjp);
-                    try {
-                        LocalDateTime started = LocalDateTime.now();
-                        log.info("[Time: {}] - Запущена индексация сайта {}.", started, site.getName());
-                        fjp.invoke(new RecursiveSiteCrawler(savedSite,
-                                site.getUrl(),
-                                jsoupParser,
-                                siteService,
-                                pageService,
-                                lemmaService,
-                                indexService));
-                        LocalDateTime ended = LocalDateTime.now();
-                        log.info("[Time: {}] - Индексация сайта {} завершена.", ended, site.getName());
-                        log.info("Длительность индексации: {} секунд.", Duration.between(started, ended).toSeconds());
-                    } finally {
-                        fjp.shutdownNow();
-                        activeIndexingTasks.remove(site.getName());
-                    }
-                    return result;
-                });
-        activeIndexingTasks.put(site.getName(), future);
+    private void handleSiteIndexingError(Throwable ex, String siteName) {
+        final SiteStatus failedStatus = SiteStatus.FAILED;
+
+        Throwable cause = ex.getCause();
+        String errorDescription = Objects.nonNull(cause) ? cause.getMessage() : ex.getMessage();
+
+        if (cause instanceof SiteNotIndexedException exception)
+            log.error("Завершение индексации ошибкой: {}", exception.getMessage());
+        else
+            log.error("Индексация завершена с неизвестной ошибкой: {}.", ex.getCause().getClass().getSimpleName());
+
+        siteService.findByName(siteName).ifPresentOrElse(siteDto -> {
+                    siteDto.setSiteStatus(failedStatus);
+                    siteDto.setLastError(errorDescription);
+                    siteService.update(siteDto);
+                },
+                () -> log.error("Сайт не найден: {}", siteName));
+    }
+
+    @SneakyThrows
+    @Transactional
+    public Response indexPage(String url) {
+
+        Optional<Site> optionalParentSite = findParentSite(url);
+        if (optionalParentSite.isEmpty())
+            return new ResponseErrorMessageDto(false,
+                    "Данная страница находится за пределами сайтов, указанных в конфигурационном файле.");
+
+        if (indexingIsRunning.compareAndSet(false, true)) {
+            Site site = optionalParentSite.get();
+            Optional<SiteDto> optionalSiteDto = siteService.findByName(site.getName());
+            if (optionalSiteDto.isPresent()) {
+                SiteDto siteDto = optionalSiteDto.get();
+                Long siteId = siteDto.getId();
+                String rawPath = url.replaceFirst(site.getUrl(), "");
+                PageDto pageDto = pageService.findByPathAndSiteId(rawPath, siteId)
+                        .orElseGet(() -> {
+                            try {
+                                Connection.Response response = jsoupParser.parseResponse(url);
+                                Document document = response.parse();
+                                String content = document.html();
+                                PageDto newPage = PageDto.builder()
+                                        .site(siteDto)
+                                        .path(rawPath)
+                                        .code(response.statusCode())
+                                        .content(content).build();
+
+                                return pageService.save(newPage);
+                            } catch (Exception exception) {
+                                return PageDto.builder()
+                                        .site(siteDto)
+                                        .path(rawPath)
+                                        .code(500)
+                                        .content(null)
+                                        .build();
+                            }
+                        });
+
+                Long pageId = pageDto.getId();
+                if (pageId != null)
+                    pageService.deleteById(pageId);
+
+                pageService.save(pageDto);
+
+                RecursiveSiteCrawler siteCrawler =
+                        new RecursiveSiteCrawler(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, lemmaFinder, true);
+
+                siteCrawler.processLemmas(siteDto, pageDto);
+                indexingIsRunning.set(false);
+            }
+
+            return new ResponseSuccessMessageDto(true);
+        }
+
+        return new ResponseErrorMessageDto(false, "Индексация уже запущена");
+    }
+
+    private CompletableFuture<Void> oneMethodAsync(Site site, String url) {
+        CompletableFuture<SiteDto> res1 = prepareSite(site);
+        CompletableFuture<SiteDto> res2 = saveSite(res1);
+        return startIndexingAsync(res2, url)
+                .thenCompose(future -> CompletableFuture
+                        .allOf(activeIndexingTasks.values()
+                                .toArray(CompletableFuture[]::new)));
+    }
+
+    private CompletableFuture<SiteDto> prepareSite(Site site) {
+        return CompletableFuture.supplyAsync(() -> prepareSiteForIndexing(site), defaultIndexingExecutor);
+    }
+
+    private CompletableFuture<SiteDto> saveSite(CompletableFuture<SiteDto> future) {
+        return future.thenApply(siteService::save);
+    }
+
+    private CompletableFuture<SiteDto> startIndexingAsync(CompletableFuture<SiteDto> future, String url) {
+        return future.thenApplyAsync(s -> {
+            activeIndexingTasks.put(s.getName(), future);
+            ForkJoinPool fjp = new ForkJoinPool(Runtime.getRuntime().availableProcessors());
+            String siteName = s.getName();
+            activeForkJoinPools.put(siteName, fjp);
+            try {
+                LocalDateTime started = LocalDateTime.now();
+                log.info("[Time: {}] - Запущена индексация сайта {}.", started, siteName);
+                fjp.invoke(new RecursiveSiteCrawler(s,
+                        url,
+                        jsoupParser,
+                        siteService,
+                        pageService,
+                        lemmaService,
+                        indexService,
+                        lemmaFinder,
+                        true));
+                LocalDateTime ended = LocalDateTime.now();
+                log.info("[Time: {}] - Индексация сайта {} завершена.", ended, siteName);
+                log.info("Длительность индексации: {} секунд.", Duration.between(started, ended).toSeconds());
+            } finally {
+                s.setStatusTime(LocalDateTime.now());
+                s.setSiteStatus(SiteStatus.INDEXED);
+                fjp.shutdownNow();
+                activeIndexingTasks.remove(siteName);
+            }
+            return s;
+        }, defaultIndexingExecutor);
     }
 
     private SiteDto prepareSiteForIndexing(Site site) {
@@ -117,7 +250,6 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                 .build();
     }
 
-    @SneakyThrows
     @Override
     public Response stopIndexing() {
 
@@ -147,16 +279,32 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         System.gc();
         indexingIsRunning.set(false);
 
-        log.info("Индексация завершилась");
+        log.info("Индексация остановлена.");
 
         return new ResponseSuccessMessageDto(true);
     }
 
-    public Response indexPage(String url) {
-        if (indexingIsRunning.get())
-            return new ResponseErrorMessageDto(false,
-                    "Индексация уже запущена");
 
-        return new ResponseSuccessMessageDto(true);
+    private String normalizeUrl(String input) {
+        try {
+            String fixedInput = input.matches("^[a-zA-Z]+://.*") ? input : "http://" + input;
+            URI uri = URI.create(fixedInput);
+            String host = uri.getHost();
+            return host != null ? host.toLowerCase() : input.toLowerCase();
+        } catch (Exception exception) {
+            return input.toLowerCase();
+        }
+    }
+
+    private Optional<Site> findParentSite(String url) {
+        try {
+            String normalizedUrl = normalizeUrl(url);
+            return sites.getSites()
+                    .stream()
+                    .filter(site -> normalizedUrl.equals(normalizeUrl(site.getUrl())))
+                    .findFirst();
+        } catch (Exception exception) {
+            return Optional.empty();
+        }
     }
 }

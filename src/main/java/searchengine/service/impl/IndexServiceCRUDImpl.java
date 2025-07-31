@@ -17,8 +17,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
-public class IndexServiceImpl implements CompositeCRUDService<IndexDto> {
+@Transactional(timeout = 15)
+public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
 
     private final IndexRepository indexRepository;
     private final CustomIndexMapper indexMapper;

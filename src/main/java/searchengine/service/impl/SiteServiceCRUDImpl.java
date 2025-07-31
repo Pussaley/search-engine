@@ -2,9 +2,6 @@ package searchengine.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.dao.CannotAcquireLockException;
-import org.springframework.retry.annotation.Backoff;
-import org.springframework.retry.annotation.Retryable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.SiteMapper;
@@ -23,8 +20,8 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional
-public class SiteServiceImpl implements CRUDService<SiteDto> {
+@Transactional(timeout = 15)
+public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
 
     private final SiteRepository siteRepository;
     private final SiteMapper siteMapper;
@@ -58,6 +55,7 @@ public class SiteServiceImpl implements CRUDService<SiteDto> {
     public SiteDto update(SiteDto siteDto) {
         if (Objects.isNull(siteDto.getId()))
             throw new NullPointerException("The field <id> is empty");
+
 
         siteDto.setStatusTime(LocalDateTime.now());
         return siteMapper.toDTO(siteRepository.save(siteMapper.toEntity(siteDto)));

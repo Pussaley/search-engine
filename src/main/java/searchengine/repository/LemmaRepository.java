@@ -1,12 +1,10 @@
 package searchengine.repository;
 
-import aj.org.objectweb.asm.commons.Remapper;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 import searchengine.model.entity.LemmaEntity;
-import searchengine.model.entity.dto.LemmaDto;
 
 import java.util.List;
 import java.util.Optional;
@@ -28,4 +26,11 @@ public interface LemmaRepository extends JpaRepository<LemmaEntity, Long> {
             nativeQuery = true,
             value = "select * from lemmas as l where l.lemma = ? and  l.site_id = ?")
     Optional<LemmaEntity> findByLemmaAndSiteId(String lemma, Long id);
+
+    @Modifying
+    @Query(
+            nativeQuery = true,
+            value = "update lemmas as l set l.frequency = l.frequency - ? where l.id = ?"
+    )
+    void updateLemmaFrequency(Integer amount, Long lemmaId);
 }

@@ -8,16 +8,16 @@ import searchengine.model.entity.LemmaEntity;
 import searchengine.model.entity.PageEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.key.IndexEntityId;
-import searchengine.service.impl.LemmaServiceImpl;
-import searchengine.service.impl.PageServiceImpl;
+import searchengine.service.impl.LemmaServiceCRUDImpl;
+import searchengine.service.impl.PageServiceCRUDImpl;
 
 @Component
 @RequiredArgsConstructor
 @Slf4j
 public class CustomIndexMapper {
 
-    private final PageServiceImpl pageService;
-    private final LemmaServiceImpl lemmaService;
+    private final PageServiceCRUDImpl pageService;
+    private final LemmaServiceCRUDImpl lemmaService;
 
     public IndexEntity toEntity(IndexDto indexDto) {
         IndexEntity indexEntity = new IndexEntity();
@@ -37,6 +37,7 @@ public class CustomIndexMapper {
         return IndexDto.builder()
                 .pageId(indexEntity.getPage().getId())
                 .lemmaId(indexEntity.getLemma().getId())
+                .rank(indexEntity.getRank())
                 .build();
     }
 }
