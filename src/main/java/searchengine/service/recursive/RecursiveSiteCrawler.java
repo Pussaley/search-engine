@@ -6,16 +6,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
-import searchengine.config.Site;
 import searchengine.exception.SiteNotIndexedException;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
-import searchengine.service.impl.IndexServiceCRUDImpl;
-import searchengine.service.impl.LemmaServiceCRUDImpl;
-import searchengine.service.impl.PageServiceCRUDImpl;
-import searchengine.service.impl.SiteServiceCRUDImpl;
+import searchengine.service.crud.impl.IndexServiceCRUDImpl;
+import searchengine.service.crud.impl.LemmaServiceCRUDImpl;
+import searchengine.service.crud.impl.PageServiceCRUDImpl;
+import searchengine.service.crud.impl.SiteServiceCRUDImpl;
 import searchengine.service.morphology.LemmaFinder;
 import searchengine.util.jsoup.JSOUPParser;
 
@@ -49,6 +48,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private static final Set<String> parsedPages = ConcurrentHashMap.newKeySet();
     private static final Map<String, ReentrantLock> PAGE_LOCKS = new ConcurrentHashMap<>();
     private static final Map<String, ReentrantLock> LEMMA_LOCKS = new ConcurrentHashMap<>();
+    private static final Object lock = new Object();
 
     public RecursiveSiteCrawler(SiteDto siteDto,
                                 String url,
@@ -103,7 +103,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     @Override
     protected void compute() {
         if (Thread.currentThread().isInterrupted() || cancelRecursiveTask) {
-            Site site = new Site();
+            SiteDto site = SiteDto.builder().build();
             site.setName(siteDto.getName());
             site.setUrl(siteDto.getUrl());
             throw new SiteNotIndexedException(site, "Индексация отменена пользователем");
@@ -112,9 +112,6 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         try {
             Connection.Response response = jsoupParser.parseResponse(this.url);
             int statusCode = response.statusCode();
-
-            if (!isPositive(statusCode))
-                return;
 
             Document document = response.parse();
             Set<String> pages = findChildPages(document);
@@ -165,7 +162,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             errorLogger(httpStatusException, httpStatusException.getUrl());
             errorSaving(RequestStatusCode.NOT_FOUND);
         } catch (CancellationException cancellationException) {
-            Site site = new Site();
+            SiteDto site = SiteDto.builder().build();
             site.setName(siteDto.getName());
             site.setUrl(siteDto.getUrl());
             throw new SiteNotIndexedException(site, "Индексация отменена пользователем");
@@ -176,12 +173,15 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     }
 
     public void processLemmas(SiteDto site, PageDto page) {
+        if (!isPositive(page.getCode()))
+            return;
+
         Map<String, Integer> lemmas = lemmaFinder.collectLemmas(page.getContent());
         for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
             String lemma = entry.getKey();
 
             ReentrantLock lemmaLock;
-            synchronized (new Object()) {
+            synchronized (lock) {
                 lemmaLock = LEMMA_LOCKS.computeIfAbsent(lemma, k -> new ReentrantLock());
             }
 

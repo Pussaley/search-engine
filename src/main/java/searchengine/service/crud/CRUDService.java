@@ -1,4 +1,4 @@
-package searchengine.service;
+package searchengine.service.crud;
 
 import java.util.Optional;
 

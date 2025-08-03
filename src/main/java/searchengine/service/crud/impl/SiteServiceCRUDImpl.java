@@ -1,5 +1,7 @@
-package searchengine.service.impl;
+package searchengine.service.crud.impl;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -9,7 +11,7 @@ import searchengine.model.SiteStatus;
 import searchengine.model.entity.SiteEntity;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.repository.SiteRepository;
-import searchengine.service.CRUDService;
+import searchengine.service.crud.CRUDService;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -25,6 +27,8 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
 
     private final SiteRepository siteRepository;
     private final SiteMapper siteMapper;
+    @PersistenceContext
+    private final EntityManager entityManager;
 
     @Transactional(readOnly = true)
     @Override
@@ -67,15 +71,35 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
         this.siteRepository.deleteById(id);
     }
 
-    public synchronized void updateStatusTimeById(Long id) {
-        siteRepository.updateStatusTimeById(LocalDateTime.now(), id);
-    }
     @Transactional(readOnly = true)
     public Optional<SiteDto> findByName(String name) {
         return siteRepository.findByName(name).map(siteMapper::toDTO);
     }
 
-    public void updateAllSitesSiteStatus(SiteStatus oldStatus, SiteStatus newStatus) {
-        siteRepository.updateAllSitesSiteStatus(oldStatus, newStatus, LocalDateTime.now());
+    public void updateSiteStatus(Long id, SiteStatus siteStatus) {
+        entityManager.createNativeQuery("update sites as s set s.status = ?, s.status_time = ? where s.id = ?")
+                .setParameter(1, siteStatus.toString())
+                .setParameter(2, LocalDateTime.now())
+                .setParameter(3, id)
+                .executeUpdate();
+    }
+
+    public void clearDatabaseFromSitePageLemmaIndexEntities(String siteName) {
+        findByName(siteName).ifPresent(dto -> {
+            Long siteId = dto.getId();
+            entityManager.createQuery("delete from IndexEntity as i where i.page.site.id = :siteId")
+                    .setParameter("siteId", siteId)
+                    .executeUpdate();
+
+            entityManager.createQuery("delete from PageEntity as p where p.site.id = :siteId")
+                    .setParameter("siteId", siteId)
+                    .executeUpdate();
+
+            entityManager.createQuery("delete from LemmaEntity as l where l.site.id = :siteId")
+                    .setParameter("siteId", siteId)
+                    .executeUpdate();
+
+            deleteById(siteId);
+        });
     }
 }

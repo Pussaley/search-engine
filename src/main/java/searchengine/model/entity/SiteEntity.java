@@ -5,6 +5,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
@@ -12,6 +13,7 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.DynamicUpdate;
 import searchengine.model.SiteStatus;
 
 import java.time.LocalDateTime;
@@ -22,6 +24,7 @@ import java.util.Set;
 @Data
 @NoArgsConstructor
 @Table(name = "sites")
+@DynamicUpdate
 public class SiteEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -37,8 +40,18 @@ public class SiteEntity {
     private String url;
     @Column(name = "name", columnDefinition = "VARCHAR(255)", nullable = false, unique = true)
     private String name;
-    @OneToMany(cascade = CascadeType.REMOVE)
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<PageEntity> pages = new HashSet<>();
-    @OneToMany(cascade = CascadeType.REMOVE)
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<LemmaEntity> lemmas = new HashSet<>();
+
+    public void addPage(PageEntity page) {
+        this.pages.add(page);
+        page.setSite(this);
+    }
+
+    public void removePage(PageEntity page) {
+        this.pages.remove(page);
+        page.setSite(null);
+    }
 }

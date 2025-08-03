@@ -7,7 +7,6 @@ import org.springframework.stereotype.Repository;
 import searchengine.model.SiteStatus;
 import searchengine.model.entity.SiteEntity;
 
-import java.time.temporal.Temporal;
 import java.util.List;
 import java.util.Optional;
 
@@ -47,14 +46,21 @@ public interface SiteRepository extends JpaRepository<SiteEntity, Long> {
     @Modifying
     @Query(
             nativeQuery = true,
-            value = "update sites s set s.status_time = ? where s.id = ?"
+            value = "update sites s set s.status_time = now() where s.id = ?"
     )
-    void updateStatusTimeById(Temporal time, Long id);
+    void updateStatusTimeById(Long id);
 
     @Modifying
     @Query(
             nativeQuery = true,
-            value = "update sites s set s.status = ?2, s.status_time = ?3 where s.status = ?1"
+            value = "update sites s set s.status = ?2, s.status_time = now() where s.status = ?1"
     )
-    void updateAllSitesSiteStatus(SiteStatus oldStatus, SiteStatus newStatus, Temporal time);
+    void updateAllSitesSiteStatus(SiteStatus oldStatus, SiteStatus newStatus);
+
+    @Modifying(flushAutomatically = true, clearAutomatically = true)
+    @Query(
+            nativeQuery = true,
+            value = "update sites s set s.status = ?2, s.status_time = now() where s.id = ?1"
+    )
+    int  updateSiteStatus(Long id, SiteStatus siteStatus);
 }

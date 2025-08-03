@@ -1,4 +1,4 @@
-package searchengine.service.impl;
+package searchengine.service.crud.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,7 +8,7 @@ import searchengine.mapper.LemmaEntityMapper;
 import searchengine.model.entity.LemmaEntity;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.repository.LemmaRepository;
-import searchengine.service.CRUDService;
+import searchengine.service.crud.CRUDService;
 
 import java.util.Optional;
 

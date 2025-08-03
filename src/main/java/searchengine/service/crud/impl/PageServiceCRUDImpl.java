@@ -1,4 +1,4 @@
-package searchengine.service.impl;
+package searchengine.service.crud.impl;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -8,10 +8,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.PageMapper;
 import searchengine.model.entity.PageEntity;
+import searchengine.model.entity.SiteEntity;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.PageRepository;
-import searchengine.service.CRUDService;
+import searchengine.service.crud.CRUDService;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -49,34 +51,31 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
 
     @Override
     public void deleteById(Long id) {
-
-        entityManager.createQuery("delete from IndexEntity i where i.page.id = :pageId")
-                .setParameter("pageId", id)
+        entityManager.createNativeQuery("update lemmas as l set l.frequency = l.frequency - 1 where id IN (select lemma_id from indexes as i where i.page_id = ?)")
+                .setParameter(1, id)
                 .executeUpdate();
 
-/*        List<IndexEntity> inds = entityManager.createQuery("select i from IndexEntity i where i.page.id = :pageId", IndexEntity.class)
-                .setParameter("pageId", id).getResultList();
+        entityManager.createNativeQuery("delete from indexes as i where i.page_id = ?")
+                .setParameter(1, id)
+                .executeUpdate();
 
-        int totalRows = 0;
+        entityManager.createNativeQuery("delete from lemmas as l where l.frequency = 0")
+                .executeUpdate();
 
-        for (IndexEntity index : inds) {
-            Long lemmaId = index.getLemma().getId();
-            Integer amount = index.getRank().intValue();
-            totalRows += entityManager.createQuery("update LemmaEntity l set l.frequency = l.frequency - :amount where l.id = :id")
-                    .setParameter("id", lemmaId)
-                    .setParameter("amount", amount)
-                    .executeUpdate();
-
-            entityManager.remove(index);
-        }
-
-        log.info("Обновлено записей: {}", totalRows);*/
-        PageEntity pageEntity = entityManager.getReference(PageEntity.class, id);
-        entityManager.remove(pageEntity);
+        entityManager.createNativeQuery("delete from pages as p where p.id = ?")
+                .setParameter(1, id)
+                .executeUpdate();
     }
 
     public PageDto save(PageDto pageDTO) {
         PageEntity pageEntity = pageMapper.toEntity(pageDTO);
+
+        Long siteId = pageEntity.getSite().getId();
+
+        SiteEntity site = entityManager.getReference(SiteEntity.class, siteId);
+        site.setStatusTime(LocalDateTime.now());
+        pageEntity.setSite(site);
+
         PageEntity savedPage = pageRepository.save(pageEntity);
         return pageMapper.toDto(savedPage);
     }

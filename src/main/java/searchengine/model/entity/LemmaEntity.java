@@ -34,6 +34,6 @@ public class LemmaEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
-    @OneToMany(cascade = CascadeType.REMOVE)
+    @OneToMany(mappedBy = "lemma", fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     private Set<IndexEntity> indexes = new HashSet<>();
 }

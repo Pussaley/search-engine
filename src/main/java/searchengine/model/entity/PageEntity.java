@@ -37,6 +37,6 @@ public class PageEntity {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
-    @OneToMany(cascade = CascadeType.REMOVE)
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "page", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<IndexEntity> indexes = new HashSet<>();
 }

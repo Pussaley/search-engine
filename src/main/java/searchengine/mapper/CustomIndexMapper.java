@@ -8,8 +8,8 @@ import searchengine.model.entity.LemmaEntity;
 import searchengine.model.entity.PageEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.key.IndexEntityId;
-import searchengine.service.impl.LemmaServiceCRUDImpl;
-import searchengine.service.impl.PageServiceCRUDImpl;
+import searchengine.service.crud.impl.LemmaServiceCRUDImpl;
+import searchengine.service.crud.impl.PageServiceCRUDImpl;
 
 @Component
 @RequiredArgsConstructor
