@@ -8,25 +8,26 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.CustomIndexMapper;
 import searchengine.model.entity.IndexEntity;
-import searchengine.model.entity.LemmaEntity;
-import searchengine.model.entity.SiteEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
-import searchengine.model.entity.dto.SiteDto;
 import searchengine.repository.IndexRepository;
 import searchengine.service.CompositeCRUDService;
 
 import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentMap;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-@Transactional(timeout = 15)
+@Transactional(timeout = 50)
 public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
 
     private final IndexRepository indexRepository;
     private final CustomIndexMapper indexMapper;
+    private final ConcurrentMap<Long, Object> pageLocks = new ConcurrentHashMap<>();
+    private final ConcurrentMap<Long, Object> lemmaLocks = new ConcurrentHashMap<>();
     @PersistenceContext
     private EntityManager entityManager;
 
@@ -52,11 +53,26 @@ public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
     }
 
     @Override
-    public IndexDto save(IndexDto indexDto) {
+    public synchronized IndexDto save(IndexDto indexDto) {
+        Long pageId = indexDto.getPageId();
+        Long lemmaId = indexDto.getLemmaId();
 
-        IndexEntity entity = indexMapper.toEntity(indexDto);
+        Long firstLockId = Math.min(pageId, lemmaId);
+        Long secondLockId = Math.max(pageId, lemmaId);
 
-        IndexEntity savedEntity = indexRepository.save(entity);
-        return indexMapper.toDto(savedEntity);
+        Object firstLock = getLock(firstLockId, pageId.equals(firstLockId) ? pageLocks : lemmaLocks);
+        Object secondLock = getLock(secondLockId, pageId.equals(secondLockId) ? pageLocks : lemmaLocks);
+
+        synchronized (firstLock) {
+            synchronized (secondLock) {
+                IndexEntity entity = indexMapper.toEntity(indexDto);
+                IndexEntity savedEntity = indexRepository.save(entity);
+                return indexMapper.toDto(savedEntity);
+            }
+        }
+    }
+
+    private Object getLock(Long id, ConcurrentMap<Long, Object> lockMap) {
+        return lockMap.computeIfAbsent(id, k -> new Object());
     }
 }
