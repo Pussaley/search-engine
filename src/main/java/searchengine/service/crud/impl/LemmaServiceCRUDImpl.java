@@ -51,4 +51,10 @@ public class LemmaServiceCRUDImpl implements CRUDService<LemmaDto> {
     public void updateLemmaFrequency(Integer amount, Long lemmaId) {
         lemmaRepository.updateLemmaFrequency(amount, lemmaId);
     }
+
+    public LemmaDto insertLemmaOrUpdateFrequency(String lemma, Long siteId) {
+        lemmaRepository.insertLemmaOrUpdateFrequency(lemma, siteId);
+        lemmaRepository.flush();
+        return lemmaRepository.findByLemmaAndSiteId(lemma, siteId).map(lemmaMapper::toDto).get();
+    }
 }

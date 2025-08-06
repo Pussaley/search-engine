@@ -189,20 +189,12 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                 lemmaLock.lockInterruptibly();
                 Integer lemmaCount = entry.getValue();
                 try {
-                    LemmaDto lemmaDto = lemmaService.findByLemmaAndSiteId(lemma, site.getId())
-                            .orElseGet(() -> LemmaDto.builder()
-                                    .lemma(lemma)
-                                    .site(site)
-                                    .frequency(0)
-                                    .build());
+                    LemmaDto lemmaDto = lemmaService.insertLemmaOrUpdateFrequency(lemma, siteDto.getId());
 
-                    lemmaDto.setFrequency(lemmaDto.getFrequency() + 1);
-                    LemmaDto savedLemma = lemmaService.save(lemmaDto);
-
-                    indexService.findByPageAndLemma(page, savedLemma).orElseGet(() ->
+                    indexService.findByPageAndLemma(page, lemmaDto).orElseGet(() ->
                             indexService.save(IndexDto.builder()
                                     .pageId(page.getId())
-                                    .lemmaId(savedLemma.getId())
+                                    .lemmaId(lemmaDto.getId())
                                     .rank(lemmaCount.floatValue())
                                     .build()));
                 } finally {

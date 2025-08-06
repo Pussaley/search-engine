@@ -33,4 +33,11 @@ public interface LemmaRepository extends JpaRepository<LemmaEntity, Long> {
             value = "update lemmas as l set l.frequency = l.frequency - ? where l.id = ?"
     )
     void updateLemmaFrequency(Integer amount, Long lemmaId);
+
+    @Modifying
+    @Query(
+            nativeQuery = true,
+            value = "insert into lemmas (lemma, site_id, frequency) VALUES (?, ?, 1) on duplicate key update frequency = frequency + 1"
+    )
+    void insertLemmaOrUpdateFrequency(String lemma, Long siteId);
 }

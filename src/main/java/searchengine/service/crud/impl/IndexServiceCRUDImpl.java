@@ -1,14 +1,19 @@
 package searchengine.service.crud.impl;
 
+import jakarta.persistence.EntityManager;
+import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.CustomIndexMapper;
 import searchengine.model.entity.IndexEntity;
+import searchengine.model.entity.LemmaEntity;
+import searchengine.model.entity.SiteEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
+import searchengine.model.entity.dto.SiteDto;
 import searchengine.repository.IndexRepository;
 import searchengine.service.CompositeCRUDService;
 
@@ -22,6 +27,8 @@ public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
 
     private final IndexRepository indexRepository;
     private final CustomIndexMapper indexMapper;
+    @PersistenceContext
+    private EntityManager entityManager;
 
     @Transactional(readOnly = true)
     @Override
