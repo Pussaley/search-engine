@@ -60,7 +60,6 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
         if (Objects.isNull(siteDto.getId()))
             throw new NullPointerException("The field <id> is empty");
 
-
         siteDto.setStatusTime(LocalDateTime.now());
         return siteMapper.toDTO(siteRepository.save(siteMapper.toEntity(siteDto)));
 

@@ -14,7 +14,6 @@ import searchengine.repository.PageRepository;
 import searchengine.service.crud.CRUDService;
 
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.Optional;
 
 @Service
@@ -40,11 +39,6 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
     }
 
     @Transactional(readOnly = true)
-    public List<PageDto> findByPath(String path) {
-        return pageRepository.findByPath(path).stream().map(pageMapper::toDto).toList();
-    }
-
-    @Transactional(readOnly = true)
     public Optional<PageDto> findByPathAndSiteId(String path, Long siteId) {
         return pageRepository.findByPathAndSiteId(path, siteId).map(pageMapper::toDto);
     }
@@ -67,12 +61,10 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
                 .executeUpdate();
     }
 
-    public PageDto save(PageDto pageDTO) {
-        PageEntity pageEntity = pageMapper.toEntity(pageDTO);
+    public synchronized PageDto save(PageDto pageDto) {
+        PageEntity pageEntity = pageMapper.toEntity(pageDto);
 
-        Long siteId = pageEntity.getSite().getId();
-
-        SiteEntity site = entityManager.getReference(SiteEntity.class, siteId);
+        SiteEntity site = entityManager.getReference(SiteEntity.class, pageDto.getSite().getId());
         site.setStatusTime(LocalDateTime.now());
         pageEntity.setSite(site);
 

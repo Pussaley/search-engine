@@ -21,6 +21,7 @@ import searchengine.model.entity.key.IndexEntityId;
 public class IndexEntity {
     @EmbeddedId
     private IndexEntityId id;
+
     @Column(name = "`rank`", nullable = false)
     private Float rank;
 

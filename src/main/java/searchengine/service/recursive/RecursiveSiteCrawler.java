@@ -210,6 +210,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
 
     private <T extends Exception> void errorLogger(T exception, String url) {
         log.error("Возникло исключение {} при обработке страницы: {}", exception.getClass().getSimpleName(), url);
+        log.error("Текст ошибки: {}", exception.getMessage());
     }
 
     private void errorSaving(RequestStatusCode statusCode) {

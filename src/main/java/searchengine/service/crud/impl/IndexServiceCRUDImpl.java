@@ -1,7 +1,5 @@
 package searchengine.service.crud.impl;
 
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,8 +13,6 @@ import searchengine.repository.IndexRepository;
 import searchengine.service.CompositeCRUDService;
 
 import java.util.Optional;
-import java.util.concurrent.ConcurrentHashMap;
-import java.util.concurrent.ConcurrentMap;
 
 @Service
 @RequiredArgsConstructor
@@ -26,10 +22,6 @@ public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
 
     private final IndexRepository indexRepository;
     private final CustomIndexMapper indexMapper;
-    private final ConcurrentMap<Long, Object> pageLocks = new ConcurrentHashMap<>();
-    private final ConcurrentMap<Long, Object> lemmaLocks = new ConcurrentHashMap<>();
-    @PersistenceContext
-    private EntityManager entityManager;
 
     @Transactional(readOnly = true)
     @Override
@@ -54,25 +46,8 @@ public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
 
     @Override
     public synchronized IndexDto save(IndexDto indexDto) {
-        Long pageId = indexDto.getPageId();
-        Long lemmaId = indexDto.getLemmaId();
-
-        Long firstLockId = Math.min(pageId, lemmaId);
-        Long secondLockId = Math.max(pageId, lemmaId);
-
-        Object firstLock = getLock(firstLockId, pageId.equals(firstLockId) ? pageLocks : lemmaLocks);
-        Object secondLock = getLock(secondLockId, pageId.equals(secondLockId) ? pageLocks : lemmaLocks);
-
-        synchronized (firstLock) {
-            synchronized (secondLock) {
-                IndexEntity entity = indexMapper.toEntity(indexDto);
-                IndexEntity savedEntity = indexRepository.save(entity);
-                return indexMapper.toDto(savedEntity);
-            }
-        }
-    }
-
-    private Object getLock(Long id, ConcurrentMap<Long, Object> lockMap) {
-        return lockMap.computeIfAbsent(id, k -> new Object());
+        IndexEntity entity = indexMapper.toEntity(indexDto);
+        IndexEntity savedEntity = indexRepository.save(entity);
+        return indexMapper.toDto(savedEntity);
     }
 }

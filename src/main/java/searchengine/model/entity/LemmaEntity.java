@@ -34,13 +34,17 @@ public class LemmaEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "lemma", nullable = false)
     private String lemma;
-    @Column(name = "frequency", nullable = false)
-    private Integer frequency;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
+
+    @Column(name = "frequency", nullable = false)
+    private Integer frequency;
+
     @OneToMany(mappedBy = "lemma", fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     private Set<IndexEntity> indexes = new HashSet<>();
 }

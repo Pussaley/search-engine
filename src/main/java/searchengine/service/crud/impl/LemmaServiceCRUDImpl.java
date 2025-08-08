@@ -38,18 +38,10 @@ public class LemmaServiceCRUDImpl implements CRUDService<LemmaDto> {
 
         return lemmaMapper.toDto(saved);
     }
-    @Transactional(readOnly = true)
-    public Optional<LemmaDto> findByLemmaAndSiteId(String lemma, Long siteId) {
-        return lemmaRepository.findByLemmaAndSiteId(lemma, siteId).map(lemmaMapper::toDto);
-    }
 
     @Override
     public void deleteById(Long id) {
         lemmaRepository.deleteById(id);
-    }
-
-    public void updateLemmaFrequency(Integer amount, Long lemmaId) {
-        lemmaRepository.updateLemmaFrequency(amount, lemmaId);
     }
 
     public LemmaDto insertLemmaOrUpdateFrequency(String lemma, Long siteId) {

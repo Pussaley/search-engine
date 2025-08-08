@@ -29,19 +29,26 @@ public class SiteEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "status", columnDefinition = "ENUM ('INDEXING', 'INDEXED', 'FAILED')", nullable = false)
     @Enumerated(value = EnumType.STRING)
     private SiteStatus siteStatus;
+
     @Column(name = "status_time", nullable = false)
     private LocalDateTime statusTime;
+
     @Column(name = "last_error", columnDefinition = "VARCHAR(255)")
     private String lastError;
+
     @Column(name = "url", columnDefinition = "VARCHAR(255)", nullable = false, unique = true)
     private String url;
+
     @Column(name = "name", columnDefinition = "VARCHAR(255)", nullable = false, unique = true)
     private String name;
+
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<PageEntity> pages = new HashSet<>();
+
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<LemmaEntity> lemmas = new HashSet<>();
 
