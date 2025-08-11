@@ -101,4 +101,12 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
             deleteById(siteId);
         });
     }
+
+    public void updateSiteStatusWithError(Long siteId, SiteStatus status, String error) {
+        entityManager.createNativeQuery("update sites as s set s.status = ?, s.status_time = now(), s.last_error = ? where s.id = ?")
+                .setParameter(1, status )
+                .setParameter(2, error)
+                .setParameter(3, siteId)
+                .executeUpdate();
+    }
 }

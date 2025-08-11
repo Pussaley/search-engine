@@ -7,15 +7,11 @@ import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import searchengine.exception.SiteNotIndexedException;
-import searchengine.model.entity.dto.IndexDto;
-import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
-import searchengine.service.crud.impl.IndexServiceCRUDImpl;
-import searchengine.service.crud.impl.LemmaServiceCRUDImpl;
 import searchengine.service.crud.impl.PageServiceCRUDImpl;
 import searchengine.service.crud.impl.SiteServiceCRUDImpl;
-import searchengine.service.morphology.LemmaFinder;
+import searchengine.service.morphology.LemmaProcessor;
 import searchengine.util.jsoup.JSOUPParser;
 
 import java.net.SocketTimeoutException;
@@ -37,9 +33,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private final JSOUPParser jsoupParser;
     private final SiteServiceCRUDImpl siteService;
     private final PageServiceCRUDImpl pageService;
-    private final LemmaServiceCRUDImpl lemmaService;
-    private final IndexServiceCRUDImpl indexService;
-    private final LemmaFinder lemmaFinder;
+    private final LemmaProcessor lemmaProcessor;
     @Setter
     private static volatile boolean cancelRecursiveTask = false;
     @Getter
@@ -47,18 +41,14 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private final boolean newIndexing;
     private static final Set<String> parsedPages = ConcurrentHashMap.newKeySet();
     private static final Map<String, ReentrantLock> PAGE_LOCKS = new ConcurrentHashMap<>();
-    private static final Map<String, ReentrantLock> LEMMA_LOCKS = new ConcurrentHashMap<>();
-    private static final Object lock = new Object();
 
     public RecursiveSiteCrawler(SiteDto siteDto,
                                 String url,
                                 JSOUPParser jsoupParser,
                                 SiteServiceCRUDImpl siteService,
                                 PageServiceCRUDImpl pageService,
-                                LemmaServiceCRUDImpl lemmaService,
-                                IndexServiceCRUDImpl indexService,
-                                LemmaFinder lemmaFinder) {
-        this(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, lemmaFinder, false);
+                                LemmaProcessor lemmaProcessor) {
+        this(siteDto, url, jsoupParser, siteService, pageService, lemmaProcessor, false);
     }
 
     public RecursiveSiteCrawler(SiteDto siteDto,
@@ -66,26 +56,18 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                                 JSOUPParser jsoupParser,
                                 SiteServiceCRUDImpl siteService,
                                 PageServiceCRUDImpl pageService,
-                                LemmaServiceCRUDImpl lemmaService,
-                                IndexServiceCRUDImpl indexService,
-                                LemmaFinder lemmaFinder,
+                                LemmaProcessor lemmaProcessor,
                                 boolean newIndexing) {
         this.siteDto = siteDto;
         this.url = url;
         this.jsoupParser = jsoupParser;
         this.siteService = siteService;
         this.pageService = pageService;
-        this.lemmaService = lemmaService;
-        this.indexService = indexService;
-        this.lemmaFinder = lemmaFinder;
+        this.lemmaProcessor = lemmaProcessor;
         this.newIndexing = newIndexing;
 
         if (newIndexing)
             parsedPages.removeIf(elem -> elem.contains(siteDto.getUrl()));
-    }
-
-    private boolean isPositive(int statusCode) {
-        return statusCode < 400;
     }
 
     private Set<String> findChildPages(Document document) {
@@ -120,17 +102,15 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(rawPath, k -> new ReentrantLock());
             pageLock.lockInterruptibly();
             try {
-                pageService.findByPathAndSiteId(rawPath, siteDto.getId())
-                        .orElseGet(() -> {
-                            PageDto pageDto = PageDto.builder()
-                                    .site(siteDto)
-                                    .content(document.html())
-                                    .path(rawPath)
-                                    .code(statusCode).build();
-                            PageDto savedPage = pageService.save(pageDto);
-                            processLemmas(siteDto, savedPage);
-                            return pageDto;
-                        });
+                PageDto pageDto = pageService.findByPathAndSiteId(rawPath, siteDto.getId())
+                        .orElseGet(() -> PageDto.builder()
+                                .site(siteDto)
+                                .content(document.html())
+                                .path(rawPath)
+                                .code(statusCode).build());
+
+                PageDto savedPage = pageService.save(pageDto);
+                lemmaProcessor.processLemmas(siteDto, savedPage);
 
                 RecursiveSiteCrawler[] tasksList = new RecursiveSiteCrawler[pages.size()];
                 int p = 0;
@@ -144,9 +124,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                             jsoupParser,
                             siteService,
                             pageService,
-                            lemmaService,
-                            indexService,
-                            lemmaFinder);
+                            lemmaProcessor);
                 }
                 ForkJoinTask.invokeAll(tasksList);
             } finally {
@@ -171,43 +149,6 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             errorSaving(RequestStatusCode.REQUEST_DENIED);
         }
     }
-
-    public void processLemmas(SiteDto site, PageDto page) {
-        if (!isPositive(page.getCode()))
-            return;
-
-        Map<String, Integer> lemmas = lemmaFinder.collectLemmas(page.getContent());
-        for (Map.Entry<String, Integer> entry : lemmas.entrySet()) {
-            String lemma = entry.getKey();
-
-            ReentrantLock lemmaLock;
-            synchronized (lock) {
-                lemmaLock = LEMMA_LOCKS.computeIfAbsent(lemma, k -> new ReentrantLock());
-            }
-
-            try {
-                lemmaLock.lockInterruptibly();
-                Integer lemmaCount = entry.getValue();
-                try {
-                    LemmaDto lemmaDto = lemmaService.insertLemmaOrUpdateFrequency(lemma, siteDto.getId());
-
-                    indexService.findByPageAndLemma(page, lemmaDto).orElseGet(() ->
-                            indexService.save(IndexDto.builder()
-                                    .pageId(page.getId())
-                                    .lemmaId(lemmaDto.getId())
-                                    .rank(lemmaCount.floatValue())
-                                    .build()));
-                } finally {
-                    lemmaLock.unlock();
-                }
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                log.warn("Поток прерван, завершаем транзакцию и освобождаем соединение");
-                throw new CancellationException("Индексация была прервана пользователем");
-            }
-        }
-    }
-
     private <T extends Exception> void errorLogger(T exception, String url) {
         log.error("Возникло исключение {} при обработке страницы: {}", exception.getClass().getSimpleName(), url);
         log.error("Текст ошибки: {}", exception.getMessage());

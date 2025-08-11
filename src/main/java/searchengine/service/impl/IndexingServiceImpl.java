@@ -1,6 +1,6 @@
 package searchengine.service.impl;
 
-import lombok.SneakyThrows;
+import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
@@ -17,21 +17,21 @@ import searchengine.model.dto.response.demo.ResponseSuccessMessageDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.IndexingService;
-import searchengine.service.crud.impl.IndexServiceCRUDImpl;
-import searchengine.service.crud.impl.LemmaServiceCRUDImpl;
 import searchengine.service.crud.impl.PageServiceCRUDImpl;
 import searchengine.service.crud.impl.SiteServiceCRUDImpl;
-import searchengine.service.morphology.LemmaFinder;
+import searchengine.service.morphology.LemmaProcessor;
 import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
 
 import java.net.URI;
+import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.CompletionException;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ForkJoinPool;
@@ -49,9 +49,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
     private final SitesList sites;
     private final SiteServiceCRUDImpl siteService;
     private final PageServiceCRUDImpl pageService;
-    private final IndexServiceCRUDImpl indexService;
-    private final LemmaServiceCRUDImpl lemmaService;
-    private final LemmaFinder lemmaFinder;
+    private final LemmaProcessor lemmaProcessor;
     private final ExecutorService defaultIndexingExecutor;
     private final AtomicBoolean indexingIsRunning = new AtomicBoolean(false);
     private final Map<String, CompletableFuture<?>> activeIndexingTasks = new ConcurrentHashMap<>();
@@ -62,17 +60,13 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                                SitesList sites,
                                SiteServiceCRUDImpl siteService,
                                PageServiceCRUDImpl pageService,
-                               IndexServiceCRUDImpl indexService,
-                               LemmaServiceCRUDImpl lemmaService,
-                               LemmaFinder lemmaFinder) {
+                               LemmaProcessor lemmaProcessor) {
         this.jsoupParser = jsoupParser;
         this.concurrencyProperties = concurrencyProperties;
         this.sites = sites;
         this.siteService = siteService;
         this.pageService = pageService;
-        this.indexService = indexService;
-        this.lemmaService = lemmaService;
-        this.lemmaFinder = lemmaFinder;
+        this.lemmaProcessor = lemmaProcessor;
         this.defaultIndexingExecutor = new ThreadPoolExecutor(
                 5,
                 10,
@@ -91,13 +85,13 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             CompletableFuture[] futures = sites.getSites()
                     .stream()
                     .map(site -> oneMethodAsync(site, site.getUrl())
-                                    .whenCompleteAsync((res, ex) -> {
-                                        if (Objects.nonNull(ex))
-                                            handleSiteIndexingError(ex, site.getUrl());
-                                        else
-                                            siteService.findByName(site.getName())
-                                                    .ifPresent(siteDto -> siteService.updateSiteStatus(siteDto.getId(), SiteStatus.INDEXED));
-                                    }, defaultIndexingExecutor))
+                            .whenCompleteAsync((res, ex) -> {
+                                if (Objects.nonNull(ex))
+                                    handleSiteIndexingError(ex, site.getUrl());
+                                else
+                                    siteService.findByName(site.getName())
+                                            .ifPresent(siteDto -> siteService.updateSiteStatus(siteDto.getId(), SiteStatus.INDEXED));
+                            }, defaultIndexingExecutor))
                     .toArray(CompletableFuture[]::new);
 
             CompletableFuture.allOf(futures)
@@ -130,9 +124,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                 () -> log.error("Сайт не найден: {}", siteName));
     }
 
-    @SneakyThrows
-    @Transactional
-    public Response indexPage(String url) {
+    public Response indexPageAsync(String url) {
 
         Optional<Site> optionalParentSite = findParentSite(url);
         if (optionalParentSite.isEmpty())
@@ -143,60 +135,29 @@ public class IndexingServiceImpl implements IndexingService<Response> {
 
             log.info("Запускаем индексацию отдельной страницы: {}", url);
 
-            CompletableFuture.supplyAsync(() -> {
-                        Site site = optionalParentSite.get();
-                        SiteDto siteDto = siteService.findByName(site.getName())
-                                .orElseGet(() -> siteService.save(SiteDto.builder()
-                                        .name(site.getName())
-                                        .url(site.getUrl())
-                                        .statusTime(LocalDateTime.now())
-                                        .siteStatus(SiteStatus.INDEXING)
-                                        .lastError(null)
-                                        .build()));
-
-                        String rawPath = url.replaceFirst(site.getUrl(), "");
-                        pageService.findByPathAndSiteId(rawPath, siteDto.getId())
-                                .ifPresent(page -> pageService.deleteById(page.getId()));
-
-                        try {
-                            Connection.Response response = jsoupParser.parseResponse(url);
-                            int statusCode = response.statusCode();
-
-                            if (statusCode == 200) {
-                                Document document = response.parse();
-
-                                PageDto newPageDto = PageDto.builder()
-                                        .code(statusCode)
-                                        .path(rawPath)
-                                        .content(document.html())
-                                        .site(siteDto)
-                                        .build();
-
-                                PageDto savedPage = pageService.save(newPageDto);
-                                new RecursiveSiteCrawler(siteDto, url, jsoupParser, siteService, pageService, lemmaService, indexService, lemmaFinder)
-                                        .processLemmas(siteDto, savedPage);
-                            }
-                        } catch (Exception exception) {
-                            throw new SiteNotIndexedException(siteDto, exception.getCause().getMessage());
-                        }
-                        return siteDto;
-                    })
-                    .whenComplete((res, ex) -> {
-                        SiteStatus status;
-                        if (Objects.isNull(ex))
-                            status = SiteStatus.INDEXED;
-                        else
-                            status = SiteStatus.FAILED;
-
-                        siteService.updateSiteStatus(res.getId(), status);
-                        log.info("Индексация {} завершена", url);
-                        indexingIsRunning.set(false);
-                    });
+            Site site = optionalParentSite.get();
+            CompletableFuture.supplyAsync(() -> preparePage(site, url))
+                    .thenApply(siteDto -> indexPageAsync(siteDto, url))
+                    .whenComplete((result, throwable) -> handlePageIndexingResult(site, result, throwable));
 
             return new ResponseSuccessMessageDto(true);
         }
 
         return new ResponseErrorMessageDto(false, "Индексация уже запущена");
+    }
+
+    private void handlePageIndexingResult(Site site, Result result, Throwable throwable) {
+
+        try {
+            Long siteId = siteService.findByName(site.getName()).map(SiteDto::getId).orElseThrow();
+
+            if (throwable != null)
+                siteService.updateSiteStatusWithError(siteId, SiteStatus.FAILED, throwable.getCause().getMessage());
+            else
+                siteService.updateSiteStatus(siteId, SiteStatus.INDEXED);
+        } finally {
+            indexingIsRunning.set(false);
+        }
     }
 
     private CompletableFuture<SiteDto> oneMethodAsync(Site site, String url) {
@@ -207,6 +168,52 @@ public class IndexingServiceImpl implements IndexingService<Response> {
 
     private CompletableFuture<SiteDto> prepareSite(Site site) {
         return CompletableFuture.supplyAsync(() -> prepareSiteForIndexing(site), defaultIndexingExecutor);
+    }
+
+    private SiteDto preparePage(Site site, String url) {
+        SiteDto siteDto = siteService.findByName(site.getName())
+                .orElseGet(() -> siteService.save(SiteDto.builder()
+                        .name(site.getName())
+                        .url(site.getUrl())
+                        .statusTime(LocalDateTime.now())
+                        .siteStatus(SiteStatus.INDEXING)
+                        .lastError(null)
+                        .build()));
+
+        if (siteDto.getSiteStatus() != SiteStatus.INDEXING)
+            siteService.updateSiteStatus(siteDto.getId(), SiteStatus.INDEXING);
+
+        String rawPath = url.replaceFirst(site.getUrl(), "");
+        pageService.findByPathAndSiteId(rawPath, siteDto.getId())
+                .ifPresent(pageService::delete);
+
+        return siteDto;
+    }
+
+    private Result indexPageAsync(SiteDto siteDto, String url) {
+        try {
+            Connection.Response response = jsoupParser.parseResponse(url);
+            int statusCode = response.statusCode();
+            String rawPath = url.replaceFirst(siteDto.getUrl(), "");
+            Document document = response.parse();
+
+            pageService.findByPathAndSiteId(rawPath, siteDto.getId())
+                    .ifPresentOrElse(page -> {
+                        throw new RuntimeException(MessageFormat.format("Страница {0} уже существует в Базе", page));
+                    }, () -> {
+                        PageDto savedPage = pageService.save(PageDto.builder()
+                                .site(siteDto)
+                                .content(document.html())
+                                .path(rawPath)
+                                .code(statusCode).build());
+                        if (savedPage.getCode() / 100 != 2)
+                            lemmaProcessor.processLemmas(siteDto, savedPage);
+                    });
+
+            return new Result(siteDto, SiteStatus.INDEXED, null);
+        } catch (Exception e) {
+            throw new CompletionException(e);
+        }
     }
 
     private CompletableFuture<SiteDto> saveSite(CompletableFuture<SiteDto> future) {
@@ -222,15 +229,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             try {
                 LocalDateTime started = LocalDateTime.now();
                 log.info("[Time: {}] - Запущена индексация сайта {}.", started, siteName);
-                fjp.invoke(new RecursiveSiteCrawler(s,
-                        url,
-                        jsoupParser,
-                        siteService,
-                        pageService,
-                        lemmaService,
-                        indexService,
-                        lemmaFinder,
-                        true));
+                fjp.invoke(new RecursiveSiteCrawler(s, url, jsoupParser, siteService, pageService, lemmaProcessor, true));
                 LocalDateTime ended = LocalDateTime.now();
                 log.info("[Time: {}] - Индексация сайта {} завершена.", ended, siteName);
                 log.info("Длительность индексации: {} секунд.", Duration.between(started, ended).toSeconds());
@@ -314,5 +313,18 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         } catch (Exception exception) {
             return Optional.empty();
         }
+    }
+}
+
+@Getter
+class Result {
+    private final SiteDto siteDto;
+    private final SiteStatus status;
+    private final String error;
+
+    public Result(SiteDto siteDto, SiteStatus status, String error) {
+        this.siteDto = siteDto;
+        this.status = status;
+        this.error = error;
     }
 }

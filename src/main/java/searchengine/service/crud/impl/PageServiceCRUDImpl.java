@@ -61,6 +61,14 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
                 .executeUpdate();
     }
 
+    public void delete(PageDto pageDto) {
+        deleteById(pageDto.getId());
+
+        entityManager.createNativeQuery("update sites as s set s.status_time = now() where s.id = ?")
+                .setParameter(1, pageDto.getSite().getId())
+                .executeUpdate();
+    }
+
     public synchronized PageDto save(PageDto pageDto) {
         PageEntity pageEntity = pageMapper.toEntity(pageDto);
 
