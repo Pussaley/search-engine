@@ -86,10 +86,12 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                     .stream()
                     .map(site -> oneMethodAsync(site, site.getUrl())
                             .whenCompleteAsync((res, ex) -> {
+                                String siteName = site.getName();
+
                                 if (Objects.nonNull(ex))
-                                    handleSiteIndexingError(ex, site.getUrl());
+                                    handleSiteIndexingError(ex, siteName);
                                 else
-                                    siteService.findByName(site.getName())
+                                    siteService.findByName(siteName)
                                             .ifPresent(siteDto -> siteService.updateSiteStatus(siteDto.getId(), SiteStatus.INDEXED));
                             }, defaultIndexingExecutor))
                     .toArray(CompletableFuture[]::new);
@@ -206,8 +208,8 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                                 .content(document.html())
                                 .path(rawPath)
                                 .code(statusCode).build());
-                        if (savedPage.getCode() / 100 != 2)
-                            lemmaProcessor.processLemmas(siteDto, savedPage);
+
+                        lemmaProcessor.processLemmas(siteDto, savedPage);
                     });
 
             return new Result(siteDto, SiteStatus.INDEXED, null);
