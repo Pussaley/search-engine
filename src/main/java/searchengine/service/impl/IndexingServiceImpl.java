@@ -1,6 +1,7 @@
 package searchengine.service.impl;
 
 import lombok.Getter;
+import lombok.SneakyThrows;
 import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.nodes.Document;
@@ -138,9 +139,12 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             log.info("Запускаем индексацию отдельной страницы: {}", url);
 
             Site site = optionalParentSite.get();
-            CompletableFuture.supplyAsync(() -> preparePage(site, url))
+            CompletableFuture<Result> completedPageIndexing = CompletableFuture.supplyAsync(() -> preparePage(site, url))
                     .thenApply(siteDto -> indexPageAsync(siteDto, url))
                     .whenComplete((result, throwable) -> handlePageIndexingResult(site, result, throwable));
+
+            CompletableFuture.allOf(completedPageIndexing)
+                    .thenRunAsync(() -> log.info("Индексация страницы {} завершена", url), defaultIndexingExecutor);
 
             return new ResponseSuccessMessageDto(true);
         }
@@ -148,9 +152,11 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         return new ResponseErrorMessageDto(false, "Индексация уже запущена");
     }
 
+    @SneakyThrows
     private void handlePageIndexingResult(Site site, Result result, Throwable throwable) {
-
         try {
+
+            TimeUnit.SECONDS.sleep(5);
             Long siteId = siteService.findByName(site.getName()).map(SiteDto::getId).orElseThrow();
 
             if (throwable != null)
