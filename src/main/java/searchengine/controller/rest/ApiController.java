@@ -1,6 +1,7 @@
 package searchengine.controller.rest;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -16,6 +17,7 @@ import searchengine.service.impl.IndexingServiceImpl;
 @RequiredArgsConstructor
 public class ApiController {
 
+    @Qualifier("mystats")
     private final StatisticsService statisticsService;
     private final IndexingServiceImpl indexingService;
 

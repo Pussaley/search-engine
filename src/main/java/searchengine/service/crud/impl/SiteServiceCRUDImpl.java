@@ -109,4 +109,11 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
                 .setParameter(3, siteId)
                 .executeUpdate();
     }
+
+    public List<SiteDto> findAll() {
+        return siteRepository.findAll()
+                .stream()
+                .map(siteMapper::toDTO)
+                .toList();
+    }
 }
