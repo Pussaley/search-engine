@@ -1,6 +1,5 @@
 package searchengine.controller.rest;
 
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +10,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.Site;
 import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
+import searchengine.model.dto.search.DataSearchResponse;
+import searchengine.model.dto.search.RelevanceData;
 import searchengine.model.dto.statistics.StatisticsResponse;
 import searchengine.search.DataSearchService;
 import searchengine.search.model.PageWithRelevanceResponse;
@@ -84,21 +85,4 @@ public class ApiController {
 
         return ResponseEntity.ok(new DataSearchResponse(true, count.intValue(), data));
     }
-}
-
-@Data
-class DataSearchResponse {
-    private final boolean result;
-    private final int count;
-    private final List<RelevanceData> data;
-}
-
-@Data
-class RelevanceData {
-    private final String site;
-    private final String siteName;
-    private final String uri;
-    private final String title;
-    private final String snippet;
-    private final float relevance;
 }
