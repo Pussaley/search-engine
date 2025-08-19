@@ -12,6 +12,7 @@ import searchengine.model.entity.dto.PageDto;
 import searchengine.search.dao.DataSearchDAO;
 import searchengine.search.model.PageWithRelevanceResponse;
 import searchengine.service.morphology.LemmaFinder;
+import searchengine.util.text.TextUtils;
 
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +34,7 @@ public class DataSearchService {
     private final DataSearchDAO dao;
     private final LemmaFinder lemmaFinder;
     private final SitesList sites;
+    private final TextUtils textUtils;
 
     public Map<Site, List<PageWithRelevanceResponse>> searchTest(String query, String siteUrl) {
         return sites.getSites().stream()
@@ -106,32 +108,19 @@ public class DataSearchService {
     }
 
     private String formSnippet(String content, List<String> lemmas) {
-        final String pageContent = clearFromHTMLTags(removeHtmlTags(content, "script"));
+        final String pageContent = textUtils.clearFromHTMLTags(textUtils.removeHtmlTags(content, "script"));
         final String emptySnippet = "Пустой сниппет";
 
         StringBuilder formedSnippet = new StringBuilder();
 
         lemmas.forEach(lemma -> {
-                    Pattern p = Pattern.compile("(" + lemma +")", Pattern.DOTALL);
+                    Pattern p = Pattern.compile("(" + lemma + ")", Pattern.DOTALL);
                     Matcher matcher = p.matcher(pageContent);
                     formedSnippet.append(matcher.find() ? matcher.group(1) : "");
                 }
         );
 
         return new StringBuilder("<b>").append(formedSnippet.isEmpty() ? emptySnippet : formedSnippet).append("</b>").toString();
-    }
-
-
-    private String removeHtmlTags(String text, String t) {
-        final String tag = t;
-        final String regExp = new StringBuilder("<").append(tag).append(">[^<].+<\\/").append(tag).append(">").toString();
-
-        return text.replaceAll(regExp, "").trim();
-    }
-
-    private String clearFromHTMLTags(String text) {
-        final String regExp = "<{1}[^>]+>{1}";
-        return text.replaceAll(regExp, " ").replaceAll("\\s+", " ").replaceAll("\n", "");
     }
 }
 
@@ -151,10 +140,5 @@ class PageWithRelevance {
 
     private float calculateRelativeRelevance() {
         return absRelevance / max_relevance;
-    }
-
-    public void printRelevance() {
-        System.out.println("Абсолютная релевантность: " + absRelevance);
-        System.out.println("Относительная релевантность: " + relRelevance);
     }
 }

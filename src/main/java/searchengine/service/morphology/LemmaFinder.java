@@ -3,6 +3,7 @@ package searchengine.service.morphology;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.morphology.LuceneMorphology;
 import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
+import searchengine.util.text.TextUtils;
 
 import java.io.IOException;
 import java.util.Arrays;
@@ -16,6 +17,7 @@ public class LemmaFinder {
 
     private final LuceneMorphology morphology;
     private final String[] particlesNames = new String[]{"МЕЖД", "ПРЕДЛ", "СОЮЗ", "ЧАСТ"};
+    private final TextUtils textUtils = new TextUtils();
 
     public static LemmaFinder getInstance() throws IOException {
         LuceneMorphology morphology = new RussianLuceneMorphology();
@@ -27,7 +29,7 @@ public class LemmaFinder {
     }
 
     public synchronized Map<String, Integer> collectLemmas(String text) {
-        String[] words = arrayContainsRussianWords(clearFromHTMLTags(text));
+        String[] words = arrayContainsRussianWords(textUtils.clearFromHTMLTags(text));
 
         return Arrays.stream(words)
                 .filter(this::isNormalBaseWord)
@@ -47,11 +49,6 @@ public class LemmaFinder {
                 .replaceAll("\\s+", " ")
                 .trim()
                 .split("\\s+");
-    }
-
-    private String clearFromHTMLTags(String text) {
-        final String regExp = "<{1}[^>]+>{1}";
-        return text.replaceAll(regExp, " ");
     }
 
     public synchronized String getMorphLemma(String word) {
