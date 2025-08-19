@@ -1,25 +1,33 @@
 package searchengine.controller.rest;
 
+import lombok.Data;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import searchengine.config.Site;
+import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
 import searchengine.model.dto.statistics.StatisticsResponse;
+import searchengine.search.DataSearchService;
+import searchengine.search.model.PageWithRelevanceResponse;
 import searchengine.service.StatisticsService;
 import searchengine.service.impl.IndexingServiceImpl;
+
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api")
 @RequiredArgsConstructor
 public class ApiController {
 
-    @Qualifier("mystats")
     private final StatisticsService statisticsService;
     private final IndexingServiceImpl indexingService;
+    private final DataSearchService dataSearchService;
 
     @GetMapping("/startIndexing")
     public ResponseEntity<?> startIndexing() {
@@ -42,7 +50,44 @@ public class ApiController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<?> search(String query) {
-        return null;
+    public ResponseEntity<?> search(String query,
+                                    @RequestParam(required = false, defaultValue = "") String site,
+                                    @RequestParam(required = false, defaultValue = "0") String offset,
+                                    @RequestParam(required = false, defaultValue = "20") String limit
+    ) {
+        if (query == null || query.isEmpty() || query.isBlank())
+            return ResponseEntity.badRequest().body(new ResponseErrorMessageDto(false, "Задан пустой поисковый запрос"));
+
+        Map<Site, List<PageWithRelevanceResponse>> results = dataSearchService.searchTest(query, site, offset, limit);
+
+        List<RelevanceData> data = new ArrayList<>();
+        results.forEach((s, list) ->
+                list.stream()
+                        .map(page -> new RelevanceData(s.getUrl(),
+                                s.getName(),
+                                page.getUri(),
+                                page.getTitle(),
+                                page.getSnippet(),
+                                page.getRelevance()))
+                        .forEach(data::add));
+
+        return ResponseEntity.ok(new DataSearchResponse(true, data.size(), data));
     }
+}
+
+@Data
+class DataSearchResponse {
+    private final boolean result;
+    private final int count;
+    private final List<RelevanceData> data;
+}
+
+@Data
+class RelevanceData {
+    private final String site;
+    private final String siteName;
+    private final String uri;
+    private final String title;
+    private final String snippet;
+    private final float relevance;
 }

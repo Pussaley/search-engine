@@ -31,11 +31,11 @@ public class LemmaFinder {
 
         return Arrays.stream(words)
                 .filter(this::isNormalBaseWord)
-                .map(word -> morphology.getNormalForms(word).get(0))
+                .map(this::getMorphLemma)
                 .collect(Collectors.toMap(Function.identity(), a -> 1, Integer::sum, HashMap::new));
     }
 
-    private boolean isNormalBaseWord(String word) {
+    public boolean isNormalBaseWord(String word) {
         return morphology.getMorphInfo(word).stream()
                 .noneMatch(s -> Arrays.stream(particlesNames).anyMatch(s::contains));
     }
@@ -52,5 +52,9 @@ public class LemmaFinder {
     private String clearFromHTMLTags(String text) {
         final String regExp = "<{1}[^>]+>{1}";
         return text.replaceAll(regExp, " ");
+    }
+
+    public synchronized String getMorphLemma(String word) {
+        return morphology.getNormalForms(word.toLowerCase()).get(0);
     }
 }

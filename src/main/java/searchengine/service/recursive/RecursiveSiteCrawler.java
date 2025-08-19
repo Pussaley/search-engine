@@ -98,6 +98,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             Document document = response.parse();
             Set<String> pages = findChildPages(document);
             String rawPath = this.url.replaceFirst(siteDto.getUrl(), "");
+            final String finalRawPath = rawPath.isEmpty() ? "/" : rawPath;
 
             ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(rawPath, k -> new ReentrantLock());
             pageLock.lockInterruptibly();
@@ -106,7 +107,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                         .orElseGet(() -> PageDto.builder()
                                 .site(siteDto)
                                 .content(document.html())
-                                .path(rawPath)
+                                .path(finalRawPath)
                                 .code(statusCode).build());
 
                 PageDto savedPage = pageService.save(pageDto);
@@ -126,7 +127,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                             pageService,
                             lemmaProcessor);
                 }
-                ForkJoinTask.invokeAll(tasksList);
+                if (tasksList.length > 0) ForkJoinTask.invokeAll(tasksList);
             } finally {
                 pageLock.unlock();
             }
@@ -149,6 +150,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             errorSaving(RequestStatusCode.REQUEST_DENIED);
         }
     }
+
     private <T extends Exception> void errorLogger(T exception, String url) {
         log.error("Возникло исключение {} при обработке страницы: {}", exception.getClass().getSimpleName(), url);
         log.error("Текст ошибки: {}", exception.getMessage());
@@ -169,19 +171,6 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                     .orElseGet(() -> pageService.save(errorDto));
         } finally {
             pageLock.unlock();
-        }
-    }
-
-    @Getter
-    private enum RecursiveTaskError {
-        MAIN_PAGE_REJECTED("Главная страница сайта не отвечает"),
-        STOPPED_BY_USER("Индексация остановлена пользователем"),
-        UNEXPECTED_ERROR("Неизвестная ошибка");
-
-        private final String description;
-
-        RecursiveTaskError(String description) {
-            this.description = description;
         }
     }
 

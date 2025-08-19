@@ -52,6 +52,7 @@ public class JSOUPParser {
         try {
             response = Jsoup.connect(url)
                     .method(Connection.Method.GET)
+                    .followRedirects(true)
                     .userAgent(userAgent.value())
                     .referrer(referer.value())
                     .headers(headers)
