@@ -34,16 +34,16 @@ public class DataSearchService {
     private final LemmaFinder lemmaFinder;
     private final SitesList sites;
 
-    public Map<Site, List<PageWithRelevanceResponse>> searchTest(String query, String siteUrl, String offset, String limit) {
+    public Map<Site, List<PageWithRelevanceResponse>> searchTest(String query, String siteUrl) {
         return sites.getSites().stream()
                 .filter(site -> site.getUrl().equalsIgnoreCase(siteUrl))
                 .findFirst()
                 .stream()
                 .collect(Collectors.toMap(Function.identity(),
-                        (site) -> search(query, site.getUrl(), offset, limit)));
+                        (site) -> search(query, site.getUrl())));
     }
 
-    public List<PageWithRelevanceResponse> search(String query, String siteUrl, String offset, String limit) {
+    public List<PageWithRelevanceResponse> search(String query, String siteUrl) {
 
         List<String> lemmas = getLemmasFromQuery(query);
 

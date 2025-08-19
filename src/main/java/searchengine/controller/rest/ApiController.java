@@ -2,6 +2,7 @@ package searchengine.controller.rest;
 
 import lombok.Data;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -17,6 +18,7 @@ import searchengine.service.StatisticsService;
 import searchengine.service.impl.IndexingServiceImpl;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 
@@ -50,15 +52,21 @@ public class ApiController {
     }
 
     @GetMapping("/search")
-    public ResponseEntity<?> search(String query,
-                                    @RequestParam(required = false, defaultValue = "") String site,
-                                    @RequestParam(required = false, defaultValue = "0") String offset,
-                                    @RequestParam(required = false, defaultValue = "20") String limit
+    public ResponseEntity<?> search(@RequestParam String query,
+                                    @RequestParam(required = false) String site,
+                                    @RequestParam(required = false) String offset,
+                                    @RequestParam(required = false) String limit,
+                                    Pageable pageable
     ) {
         if (query == null || query.isEmpty() || query.isBlank())
             return ResponseEntity.badRequest().body(new ResponseErrorMessageDto(false, "Задан пустой поисковый запрос"));
 
-        Map<Site, List<PageWithRelevanceResponse>> results = dataSearchService.searchTest(query, site, offset, limit);
+        Map<Site, List<PageWithRelevanceResponse>> results = dataSearchService.searchTest(query, site);
+
+        Long count = results.values()
+                .stream()
+                .mapToLong(List::size)
+                .sum();
 
         List<RelevanceData> data = new ArrayList<>();
         results.forEach((s, list) ->
@@ -69,9 +77,12 @@ public class ApiController {
                                 page.getTitle(),
                                 page.getSnippet(),
                                 page.getRelevance()))
+                        .sorted(Comparator.comparing(RelevanceData::getRelevance))
+                        .skip(Long.parseLong(offset))
+                        .limit(Long.parseLong(limit))
                         .forEach(data::add));
 
-        return ResponseEntity.ok(new DataSearchResponse(true, data.size(), data));
+        return ResponseEntity.ok(new DataSearchResponse(true, count.intValue(), data));
     }
 }
 
