@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.jsoup.Connection;
 import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 import searchengine.exception.SiteNotIndexedException;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
@@ -15,6 +17,7 @@ import searchengine.service.morphology.LemmaProcessor;
 import searchengine.util.jsoup.JSOUPParser;
 
 import java.net.SocketTimeoutException;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
@@ -74,12 +77,50 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         String formats = "yml|yaml|nc|eps|ws|sql|png|jpg|jpeg|gif|webp|bmp|svg|ico|mp4|webm|ogg|ogv|oga|mp3|wav|pdf|doc|docx|xls|xlsx|ppt|pptx|txt|rtf|zip|rar|7z|tgz|js|css|xml|json|woff|woff2|ttf|otf|apk|exe|bin";
         String cssSelector = "a:not([href~=(#|tel|mailto)|(?i)\\.(".concat(formats).concat(")])");
 
-        return document.select(cssSelector).stream()
+        Set<String> pages = findPagination(document)
+                .stream()
+                .filter(parsedPages::add)
+                .collect(Collectors.toSet());
+
+        Set<String> strings = document.select(cssSelector).stream()
                 .map(e -> e.attr("abs:href"))
                 .filter(e -> e.startsWith(siteDto.getUrl()))
-                .map(e -> e.endsWith("/") ? e : e.concat("/"))
+                .map(this::repairUrl)
                 .filter(parsedPages::add)
                 .collect(Collectors.toCollection(HashSet::new));
+
+        strings.addAll(pages);
+
+        return strings;
+    }
+
+    private String repairUrl(String url) {
+        return url.endsWith(".html") ? url : url.endsWith("/") ? url : url.concat("/");
+    }
+
+    private Set<String> findPagination(Document document) {
+        return document.baseUri().contains("playback.ru")
+                ? toPageableUrls(document)
+                : Collections.emptySet();
+    }
+
+    private Set<String> toPageableUrls(Document document) {
+        final String baseUri = document.baseUri();
+
+        Elements elements = document.select("div.pager span.page");
+        if (elements.isEmpty())
+            return Collections.emptySet();
+
+        String uri = (baseUri.contains("page="))
+                ? baseUri.replaceFirst("page=\\d+", "page=")
+                : baseUri.endsWith("/")
+                        ? baseUri.concat("page=")
+                        : baseUri.concat("/page=");
+
+        return elements.stream()
+                .map(Element::text)
+                .map(uri::concat)
+                .collect(Collectors.toSet());
     }
 
     @Override

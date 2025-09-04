@@ -51,6 +51,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
     private final PageServiceCRUDImpl pageService;
     private final LemmaProcessor lemmaProcessor;
     private final ExecutorService defaultIndexingExecutor;
+    @Getter
     private final AtomicBoolean indexingIsRunning = new AtomicBoolean(false);
     private final Map<String, CompletableFuture<?>> activeIndexingTasks = new ConcurrentHashMap<>();
     private final Map<String, ForkJoinPool> activeForkJoinPools = new ConcurrentHashMap<>();

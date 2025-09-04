@@ -155,4 +155,11 @@ public class DataSearchDAO {
                 .map(indexMapper::toDto)
                 .toList();
     }
+
+    public Integer countPagesBySiteId(Long siteId) {
+        Long count = (Long) entityManager.createNativeQuery("select count(*) from pages as p where p.site_id = ?")
+                .setParameter(1, siteId)
+                .getSingleResult();
+        return count.intValue();
+    }
 }

@@ -12,6 +12,7 @@ import searchengine.model.dto.statistics.StatisticsResponse;
 import searchengine.model.dto.statistics.TotalStatistics;
 import searchengine.model.entity.SiteEntity;
 import searchengine.service.StatisticsService;
+import searchengine.service.impl.IndexingServiceImpl;
 
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -24,13 +25,15 @@ public class MyStatisticsImpl implements StatisticsService {
 
     @PersistenceContext
     private final EntityManager entityManager;
+    private final IndexingServiceImpl indexingService;
 
     @Override
     @Transactional
     public StatisticsResponse getStatistics() {
         StatisticsResponse response = new StatisticsResponse();
-        response.setResult(true);
+
         response.setStatistics(formStatisticsData());
+        response.setResult(true);
 
         return response;
     }
@@ -79,14 +82,17 @@ public class MyStatisticsImpl implements StatisticsService {
     private TotalStatistics formTotalStatistics() {
         TotalStatistics total = new TotalStatistics();
 
-        Long sites = (Long) entityManager.createNativeQuery("select count(*) from sites").getSingleResult();
-        Long pages = (Long) entityManager.createNativeQuery("select count(*) from pages").getSingleResult();
-        Long lemmas = (Long) entityManager.createNativeQuery("select count(*) from lemmas").getSingleResult();
+        Long sites = (Long) entityManager
+                .createNativeQuery("select count(*) from sites").getSingleResult();
+        Long pages = (Long) entityManager
+                .createNativeQuery("select count(*) from pages").getSingleResult();
+        Long lemmas = (Long) entityManager
+                .createNativeQuery("select count(*) from lemmas").getSingleResult();
 
         total.setSites(sites.intValue());
         total.setPages(pages.intValue());
         total.setLemmas(lemmas.intValue());
-        total.setIndexing(true);
+        total.setIndexing(indexingService.getIndexingIsRunning().get());
 
         return total;
     }
