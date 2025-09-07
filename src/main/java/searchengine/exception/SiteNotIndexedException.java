@@ -1,7 +1,6 @@
 package searchengine.exception;
 
 import lombok.Getter;
-import searchengine.config.Site;
 import searchengine.model.SiteStatus;
 import searchengine.model.entity.dto.SiteDto;
 

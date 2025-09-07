@@ -1,7 +1,6 @@
 package searchengine.mapper;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import searchengine.model.entity.IndexEntity;
 import searchengine.model.entity.LemmaEntity;
@@ -13,7 +12,6 @@ import searchengine.service.crud.impl.PageServiceCRUDImpl;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class CustomIndexMapper {
 
     private final PageServiceCRUDImpl pageService;

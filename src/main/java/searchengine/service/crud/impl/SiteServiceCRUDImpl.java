@@ -14,8 +14,6 @@ import searchengine.repository.SiteRepository;
 import searchengine.service.crud.CRUDService;
 
 import java.time.LocalDateTime;
-import java.util.Collections;
-import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 
@@ -35,11 +33,6 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
     public Optional<SiteDto> findById(Long id) {
         return this.siteRepository.findById(id)
                 .map(siteMapper::toDTO);
-    }
-    @Transactional(readOnly = true)
-    public List<SiteDto> findNotIndexedSites() {
-        List<SiteEntity> list = this.siteRepository.findSitesByStatusNotIndexed();
-        return list.isEmpty() ? Collections.emptyList() : list.stream().map(siteMapper::toDTO).toList();
     }
 
     public SiteDto save(SiteDto siteDTO) {
@@ -108,12 +101,5 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
                 .setParameter(2, error)
                 .setParameter(3, siteId)
                 .executeUpdate();
-    }
-
-    public List<SiteDto> findAll() {
-        return siteRepository.findAll()
-                .stream()
-                .map(siteMapper::toDTO)
-                .toList();
     }
 }

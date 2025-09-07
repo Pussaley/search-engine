@@ -51,14 +51,4 @@ public class SiteEntity {
 
     @OneToMany(fetch = FetchType.LAZY, mappedBy = "site", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<LemmaEntity> lemmas = new HashSet<>();
-
-    public void addPage(PageEntity page) {
-        this.pages.add(page);
-        page.setSite(this);
-    }
-
-    public void removePage(PageEntity page) {
-        this.pages.remove(page);
-        page.setSite(null);
-    }
 }

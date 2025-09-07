@@ -9,15 +9,12 @@ import org.springframework.transaction.annotation.Transactional;
 import searchengine.mapper.CustomIndexMapper;
 import searchengine.mapper.LemmaEntityMapper;
 import searchengine.mapper.PageMapper;
-import searchengine.mapper.SiteMapper;
 import searchengine.model.entity.IndexEntity;
 import searchengine.model.entity.LemmaEntity;
 import searchengine.model.entity.PageEntity;
-import searchengine.model.entity.SiteEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
-import searchengine.model.entity.dto.SiteDto;
 
 import java.util.List;
 import java.util.Objects;
@@ -31,20 +28,9 @@ import java.util.Optional;
 public class DataSearchDAO {
     @PersistenceContext
     private final EntityManager entityManager;
-    private final SiteMapper siteMapper;
     private final PageMapper pageMapper;
     private final LemmaEntityMapper lemmaMapper;
     private final CustomIndexMapper indexMapper;
-
-    public SiteDto findSiteDtoBySiteUrl(String siteUrl) {
-        SiteEntity site =
-                (SiteEntity) entityManager.createNativeQuery("select * from sites as s where s.url = ?",
-                                SiteEntity.class)
-                        .setParameter(1, siteUrl)
-                        .getSingleResult();
-
-        return siteMapper.toDTO(site);
-    }
 
     public Long getSiteIdBySiteUrl(String siteUrl) {
         return entityManager.createQuery("select s.id from SiteEntity as s where s.url = :siteUrl",
@@ -103,41 +89,6 @@ public class DataSearchDAO {
                 .stream()
                 .filter(Objects::nonNull)
                 .map(pageMapper::toDto)
-                .toList();
-    }
-
-    public List<IndexDto> findIndexesByLemmaAndSiteId(String lemma, Long siteId) {
-        return entityManager.createQuery("""
-                                select i
-                                from IndexEntity as i
-                                where i.lemma.id =
-                                            (select l.id from LemmaEntity as l where l.lemma = :lemma and l.site.id = :siteId)""",
-                        IndexEntity.class)
-                .setParameter("lemma", lemma)
-                .setParameter("siteId", siteId)
-                .getResultList()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(indexMapper::toDto)
-                .toList();
-    }
-
-    public List<IndexDto> findIndexesByLemmaAndSiteId(String lemma, Long siteId, List<IndexDto> indexes) {
-        List<Long> pagesIds = indexes.stream().map(IndexDto::getPageId).toList();
-        return entityManager.createQuery("""
-                                select i
-                                from IndexEntity as i
-                                where i.lemma.id =
-                                            (select l.id from LemmaEntity as l where l.lemma = :lemma and l.site.id = :siteId)
-                                and i.page.id in :pageIds""",
-                        IndexEntity.class)
-                .setParameter("lemma", lemma)
-                .setParameter("siteId", siteId)
-                .setParameter("pageIds", pagesIds)
-                .getResultList()
-                .stream()
-                .filter(Objects::nonNull)
-                .map(indexMapper::toDto)
                 .toList();
     }
 

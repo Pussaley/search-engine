@@ -25,12 +25,12 @@ public class JSOUPParser {
     public static final Set<String> incorrectLinks = new CopyOnWriteArraySet<>();
 
     public synchronized Connection.Response parseResponse(String url)
-            throws HttpStatusException, UnsupportedMimeTypeException, SocketTimeoutException {
+            throws IOException {
         return executeWithDefaultParams(url);
     }
 
     private Connection.Response executeWithDefaultParams(String url)
-            throws HttpStatusException, UnsupportedMimeTypeException, SocketTimeoutException {
+            throws IOException {
 
         String userAgent = jsoupProperties.getUserAgent();
         String referrer = jsoupProperties.getReferrer();
@@ -45,7 +45,7 @@ public class JSOUPParser {
                                               Referer referer,
                                               int timeOut,
                                               Map<String, String> headers)
-            throws HttpStatusException, UnsupportedMimeTypeException, SocketTimeoutException {
+            throws IOException {
 
         Connection.Response response = null;
 
@@ -61,17 +61,18 @@ public class JSOUPParser {
             throw socketTimeoutException;
         } catch (IOException IOE) {
             if (IOE instanceof HttpStatusException httpStatusException) {
+                log.error("Возникло исключение при парсинге {}. Пробрасываем исключение выше", url);
                 throw httpStatusException;
             }
             if (IOE instanceof UnsupportedMimeTypeException unsupportedMimeTypeException) {
-                log.error("URL <{}> has incorrect mime-type, its type is: {}",
+                log.error("Некорректный mime-type у URL <{}> , тип файла: {}. Пробрасываем исключение выше",
                         unsupportedMimeTypeException.getUrl(),
                         unsupportedMimeTypeException.getMimeType());
                 incorrectLinks.add(url);
                 throw unsupportedMimeTypeException;
             }
-            log.error("IOException were thrown while executing the request to {}", url);
-            log.error("Error: {}", IOE.getClass());
+            log.error("При парсинге {} возникло исключение: {}", url,  IOE.getClass());
+            throw IOE;
         }
         return response;
     }
