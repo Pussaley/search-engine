@@ -1,0 +1,11 @@
+databaseChangeLog:
+  - changeSet:
+      id: 30
+      author: pussaley
+      changes:
+        - createIndex:
+            tableName: pages
+            indexName: page_path_idx
+            columns:
+              - column:
+                  name: path

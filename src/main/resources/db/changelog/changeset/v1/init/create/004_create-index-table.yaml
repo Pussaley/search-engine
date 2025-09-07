@@ -1,0 +1,25 @@
+databaseChangeLog:
+  - changeSet:
+      id: 4
+      author: pussaley
+      failOnError: true
+      dbms: mysql, postgresql
+      changes:
+        - createTable:
+            tableName: indexes
+            columns:
+              - column:
+                  name: page_id
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: lemma_id
+                  type: bigint
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: rank
+                  type: float
+                  constraints:
+                    nullable: false

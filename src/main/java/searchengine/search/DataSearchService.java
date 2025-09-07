@@ -57,6 +57,8 @@ public class DataSearchService {
         StringBuilder stringBuilder = new StringBuilder();
 
         for (String qWord : queryWords) {
+            if (qWord.length() < 3) continue;
+
             final String regexp = "\\b".concat(qWord.substring(0, qWord.length() - 2)).concat(".*?(?=$|\\s|[.,!?])");
             Matcher matcher = Pattern
                     .compile(regexp, Pattern.UNICODE_CHARACTER_CLASS | Pattern.CASE_INSENSITIVE)

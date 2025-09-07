@@ -1,0 +1,14 @@
+databaseChangeLog:
+  - changeSet:
+      id: 40
+      author: pussaley
+      changes:
+        - createIndex:
+            tableName: lemmas
+            indexName: lemma_site_id_unique_idx
+            unique: true
+            columns:
+              - column:
+                  name: lemma
+              - column:
+                  name: site_id
