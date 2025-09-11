@@ -11,7 +11,6 @@ import searchengine.model.dto.statistics.StatisticsData;
 import searchengine.model.dto.statistics.StatisticsResponse;
 import searchengine.model.dto.statistics.TotalStatistics;
 import searchengine.model.entity.SiteEntity;
-import searchengine.service.StatisticsService;
 import searchengine.service.impl.IndexingServiceImpl;
 
 import java.time.ZoneOffset;

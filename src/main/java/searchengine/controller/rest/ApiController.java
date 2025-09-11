@@ -16,7 +16,7 @@ import searchengine.model.dto.search.RelevanceData;
 import searchengine.model.dto.statistics.StatisticsResponse;
 import searchengine.search.DataSearchService;
 import searchengine.search.model.PageWithRelevanceResponse;
-import searchengine.service.StatisticsService;
+import searchengine.service.statistics.StatisticsService;
 import searchengine.service.impl.IndexingServiceImpl;
 
 import java.util.ArrayList;

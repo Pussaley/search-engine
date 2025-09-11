@@ -10,7 +10,7 @@ import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.IndexRepository;
-import searchengine.service.CompositeCRUDService;
+import searchengine.service.crud.CRUDService;
 
 import java.util.Optional;
 
@@ -18,7 +18,7 @@ import java.util.Optional;
 @RequiredArgsConstructor
 @Slf4j
 @Transactional(timeout = 50)
-public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
+public class IndexServiceCRUDImpl implements CRUDService<IndexDto> {
 
     private final IndexRepository indexRepository;
     private final CustomIndexMapper indexMapper;
@@ -29,7 +29,6 @@ public class IndexServiceCRUDImpl implements CompositeCRUDService<IndexDto> {
         return Optional.empty();
     }
 
-    @Override
     @Transactional(readOnly = true)
     public Optional<IndexDto> findByPageIdAndLemmaId(Long pageId, Long lemmaId) {
         return indexRepository.findByPageIdAndLemmaId(pageId, lemmaId).map(indexMapper::toDto);
