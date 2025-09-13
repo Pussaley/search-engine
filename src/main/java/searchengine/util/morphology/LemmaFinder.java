@@ -1,4 +1,4 @@
-package searchengine.service.morphology;
+package searchengine.util.morphology;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.lucene.morphology.LuceneMorphology;
@@ -29,7 +29,7 @@ public class LemmaFinder {
     }
 
     public synchronized Map<String, Integer> collectLemmas(String text) {
-        String[] words = arrayContainsRussianWords(textUtils.clearFromHTMLTags(text));
+        String[] words = textUtils.arrayContainsRussianWords(textUtils.clearFromHTMLTags(text));
 
         return Arrays.stream(words)
                 .filter(this::isNormalBaseWord)
@@ -40,15 +40,6 @@ public class LemmaFinder {
     public boolean isNormalBaseWord(String word) {
         return morphology.getMorphInfo(word).stream()
                 .noneMatch(s -> Arrays.stream(particlesNames).anyMatch(s::contains));
-    }
-
-    private String[] arrayContainsRussianWords(String text) {
-        return text.toLowerCase()
-                .replaceAll("ё", "е")
-                .replaceAll("([^а-я\\s])", " ")
-                .replaceAll("\\s+", " ")
-                .trim()
-                .split("\\s+");
     }
 
     public synchronized String getMorphLemma(String word) {

@@ -1,17 +1,16 @@
-package searchengine.search;
+package searchengine.service.search;
 
-import lombok.Data;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
-import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
-import searchengine.search.dao.DataSearchDAO;
-import searchengine.search.model.PageWithRelevanceResponse;
-import searchengine.service.morphology.LemmaFinder;
+import searchengine.service.search.dao.DataSearchDAO;
+import searchengine.service.search.model.PageWithRelevanceResponse;
+import searchengine.service.search.response.PageWithRelevance;
+import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
 import java.util.ArrayList;
@@ -249,38 +248,10 @@ public class DataSearchService {
                 .toList();
     }
 
-    private String[] arrayContainsRussianWords(String text) {
-        return text.toLowerCase()
-                .replaceAll("ё", "е")
-                .replaceAll("([^а-я\\s])", " ")
-                .replaceAll("\\s+", " ")
-                .trim()
-                .split("\\s+");
-    }
-
     private List<String> getLemmasFromQuery(String query) {
-        return Arrays.stream(arrayContainsRussianWords(query))
+        return Arrays.stream(textUtils.arrayContainsRussianWords(query))
                 .filter(lemmaFinder::isNormalBaseWord)
                 .map(lemmaFinder::getMorphLemma)
                 .toList();
-    }
-}
-
-@Data
-class PageWithRelevance {
-    private static float max_relevance = 0;
-    private final PageDto page;
-    private final float absRelevance;
-    private final float relRelevance;
-
-    public PageWithRelevance(PageDto pageDto, List<IndexDto> indexes) {
-        this.page = pageDto;
-        this.absRelevance = indexes.stream().map(IndexDto::getRank).reduce((float) 0, Float::sum);
-        max_relevance = Math.max(absRelevance, max_relevance);
-        this.relRelevance = calculateRelativeRelevance();
-    }
-
-    private float calculateRelativeRelevance() {
-        return absRelevance / max_relevance;
     }
 }

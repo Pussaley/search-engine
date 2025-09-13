@@ -1,4 +1,4 @@
-package searchengine.service.impl;
+package searchengine.service.indexing.impl;
 
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -12,18 +12,19 @@ import searchengine.config.props.concurrency.ConcurrencyProperties;
 import searchengine.exception.SiteNotIndexedException;
 import searchengine.model.SiteStatus;
 import searchengine.model.dto.response.Response;
-import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
-import searchengine.model.dto.response.demo.ResponseSuccessMessageDto;
+import searchengine.model.dto.response.Result;
+import searchengine.model.dto.response.indexing.ResponseErrorMessageDto;
+import searchengine.model.dto.response.indexing.ResponseSuccessMessageDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
-import searchengine.service.IndexingService;
 import searchengine.service.crud.impl.PageServiceCRUDImpl;
 import searchengine.service.crud.impl.SiteServiceCRUDImpl;
+import searchengine.service.indexing.IndexingService;
 import searchengine.service.morphology.LemmaProcessor;
 import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
+import searchengine.util.url.UrlNormalizer;
 
-import java.net.URI;
 import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
@@ -45,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 public class IndexingServiceImpl implements IndexingService<Response> {
 
     private final JSOUPParser jsoupParser;
+    private final UrlNormalizer urlNormalizer;
     private final ConcurrencyProperties concurrencyProperties;
     private final SitesList sites;
     private final SiteServiceCRUDImpl siteService;
@@ -57,12 +59,14 @@ public class IndexingServiceImpl implements IndexingService<Response> {
     private final Map<String, ForkJoinPool> activeForkJoinPools = new ConcurrentHashMap<>();
 
     public IndexingServiceImpl(JSOUPParser jsoupParser,
+                               UrlNormalizer urlNormalizer,
                                ConcurrencyProperties concurrencyProperties,
                                SitesList sites,
                                SiteServiceCRUDImpl siteService,
                                PageServiceCRUDImpl pageService,
                                LemmaProcessor lemmaProcessor) {
         this.jsoupParser = jsoupParser;
+        this.urlNormalizer = urlNormalizer;
         this.concurrencyProperties = concurrencyProperties;
         this.sites = sites;
         this.siteService = siteService;
@@ -286,23 +290,12 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         return new ResponseSuccessMessageDto(true);
     }
 
-    private String normalizeUrl(String input) {
-        try {
-            String fixedInput = input.matches("^[a-zA-Z]+://.*") ? input : "http://" + input;
-            URI uri = URI.create(fixedInput);
-            String host = uri.getHost();
-            return host != null ? host.toLowerCase() : input.toLowerCase();
-        } catch (Exception exception) {
-            return input.toLowerCase();
-        }
-    }
-
     private Optional<Site> findParentSite(String url) {
         try {
-            String normalizedUrl = normalizeUrl(url);
+            String normalizedUrl = urlNormalizer.normalize(url);
             return sites.getSites()
                     .stream()
-                    .filter(site -> normalizedUrl.equals(normalizeUrl(site.getUrl())))
+                    .filter(site -> normalizedUrl.equals(urlNormalizer.normalize(site.getUrl())))
                     .findFirst();
         } catch (Exception exception) {
             return Optional.empty();
@@ -312,18 +305,5 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         activeForkJoinPools.clear();
         activeIndexingTasks.clear();
         System.gc();
-    }
-}
-
-@Getter
-class Result {
-    private final SiteDto siteDto;
-    private final SiteStatus status;
-    private final String error;
-
-    public Result(SiteDto siteDto, SiteStatus status, String error) {
-        this.siteDto = siteDto;
-        this.status = status;
-        this.error = error;
     }
 }

@@ -1,4 +1,4 @@
-package searchengine.config.props;
+package searchengine.config.props.jsoup;
 
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Configuration;

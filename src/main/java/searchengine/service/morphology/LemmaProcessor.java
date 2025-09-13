@@ -9,6 +9,7 @@ import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.crud.impl.IndexServiceCRUDImpl;
 import searchengine.service.crud.impl.LemmaServiceCRUDImpl;
+import searchengine.util.morphology.LemmaFinder;
 
 import java.util.Map;
 import java.util.concurrent.CancellationException;

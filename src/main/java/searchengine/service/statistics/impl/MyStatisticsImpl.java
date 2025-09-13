@@ -1,4 +1,4 @@
-package searchengine.service.statistics;
+package searchengine.service.statistics.impl;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -11,7 +11,8 @@ import searchengine.model.dto.statistics.StatisticsData;
 import searchengine.model.dto.statistics.StatisticsResponse;
 import searchengine.model.dto.statistics.TotalStatistics;
 import searchengine.model.entity.SiteEntity;
-import searchengine.service.impl.IndexingServiceImpl;
+import searchengine.service.indexing.impl.IndexingServiceImpl;
+import searchengine.service.statistics.StatisticsService;
 
 import java.time.ZoneOffset;
 import java.util.ArrayList;

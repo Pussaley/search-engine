@@ -1,4 +1,4 @@
-package searchengine.model.dto.response.demo;
+package searchengine.model.dto.response.indexing;
 
 import searchengine.model.dto.response.Response;
 

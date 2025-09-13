@@ -10,14 +10,14 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
-import searchengine.model.dto.response.demo.ResponseErrorMessageDto;
+import searchengine.model.dto.response.indexing.ResponseErrorMessageDto;
 import searchengine.model.dto.search.DataSearchResponse;
 import searchengine.model.dto.search.RelevanceData;
 import searchengine.model.dto.statistics.StatisticsResponse;
-import searchengine.search.DataSearchService;
-import searchengine.search.model.PageWithRelevanceResponse;
+import searchengine.service.search.DataSearchService;
+import searchengine.service.search.model.PageWithRelevanceResponse;
 import searchengine.service.statistics.StatisticsService;
-import searchengine.service.impl.IndexingServiceImpl;
+import searchengine.service.indexing.impl.IndexingServiceImpl;
 
 import java.util.ArrayList;
 import java.util.Comparator;

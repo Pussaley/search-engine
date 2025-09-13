@@ -18,4 +18,13 @@ public class TextUtils {
 
         return text.replaceAll(regExp, "").trim();
     }
+
+    public String[] arrayContainsRussianWords(String text) {
+        return text.toLowerCase()
+                .replaceAll("ё", "е")
+                .replaceAll("([^а-я\\s])", " ")
+                .replaceAll("\\s+", " ")
+                .trim()
+                .split("\\s+");
+    }
 }

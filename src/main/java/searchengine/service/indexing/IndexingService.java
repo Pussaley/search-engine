@@ -1,4 +1,4 @@
-package searchengine.service;
+package searchengine.service.indexing;
 
 import java.util.concurrent.ExecutionException;
 
