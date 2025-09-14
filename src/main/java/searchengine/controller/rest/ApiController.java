@@ -15,7 +15,7 @@ import searchengine.model.dto.search.DataSearchResponse;
 import searchengine.model.dto.search.RelevanceData;
 import searchengine.model.dto.statistics.StatisticsResponse;
 import searchengine.service.search.DataSearchService;
-import searchengine.service.search.model.PageWithRelevanceResponse;
+import searchengine.model.dto.response.search.PageWithRelevanceResponse;
 import searchengine.service.statistics.StatisticsService;
 import searchengine.service.indexing.impl.IndexingServiceImpl;
 

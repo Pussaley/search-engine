@@ -1,4 +1,4 @@
-package searchengine.service.search.dao;
+package searchengine.repository;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;

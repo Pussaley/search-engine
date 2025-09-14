@@ -12,7 +12,7 @@ import searchengine.config.props.concurrency.ConcurrencyProperties;
 import searchengine.exception.SiteNotIndexedException;
 import searchengine.model.SiteStatus;
 import searchengine.model.dto.response.Response;
-import searchengine.model.dto.response.Result;
+import searchengine.model.dto.response.indexing.IndexingResultResponse;
 import searchengine.model.dto.response.indexing.ResponseErrorMessageDto;
 import searchengine.model.dto.response.indexing.ResponseSuccessMessageDto;
 import searchengine.model.entity.dto.PageDto;
@@ -144,7 +144,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             log.info("Запускаем индексацию отдельной страницы: {}", url);
 
             Site site = optionalParentSite.get();
-            CompletableFuture<Result> completedPageIndexing = CompletableFuture.supplyAsync(() -> preparePage(site, url))
+            CompletableFuture<IndexingResultResponse> completedPageIndexing = CompletableFuture.supplyAsync(() -> preparePage(site, url))
                     .thenApply(siteDto -> indexPageAsync(siteDto, url))
                     .whenComplete((result, throwable) -> handlePageIndexingResult(site, result, throwable));
 
@@ -157,7 +157,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         return new ResponseErrorMessageDto(false, "Индексация уже запущена");
     }
 
-    private void handlePageIndexingResult(Site site, Result result, Throwable throwable) {
+    private void handlePageIndexingResult(Site site, IndexingResultResponse result, Throwable throwable) {
         try {
             Long siteId = siteService.findByName(site.getName()).map(SiteDto::getId).orElseThrow();
 
@@ -195,7 +195,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         return siteDto;
     }
 
-    private Result indexPageAsync(SiteDto siteDto, String url) {
+    private IndexingResultResponse indexPageAsync(SiteDto siteDto, String url) {
         try {
             Connection.Response response = jsoupParser.parseResponse(url);
             int statusCode = response.statusCode();
@@ -215,7 +215,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
                         lemmaProcessor.processLemmas(siteDto, savedPage);
                     });
 
-            return new Result(siteDto, SiteStatus.INDEXED, null);
+            return new IndexingResultResponse(siteDto, SiteStatus.INDEXED, null);
         } catch (Exception e) {
             throw new CompletionException(e);
         }

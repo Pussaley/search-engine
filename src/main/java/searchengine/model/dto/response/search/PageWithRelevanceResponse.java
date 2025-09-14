@@ -1,11 +1,12 @@
-package searchengine.service.search.model;
+package searchengine.model.dto.response.search;
 
 import lombok.Data;
 import lombok.Getter;
+import searchengine.model.dto.response.Response;
 
 @Data
 @Getter
-public class PageWithRelevanceResponse {
+public class PageWithRelevanceResponse implements Response {
     private final String uri;
     private final String title;
     private final String snippet;

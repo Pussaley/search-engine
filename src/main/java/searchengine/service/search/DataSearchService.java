@@ -7,9 +7,9 @@ import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
-import searchengine.service.search.dao.DataSearchDAO;
-import searchengine.service.search.model.PageWithRelevanceResponse;
-import searchengine.service.search.response.PageWithRelevance;
+import searchengine.repository.DataSearchDAO;
+import searchengine.model.dto.response.search.PageWithRelevanceResponse;
+import searchengine.model.dto.search.PageWithRelevance;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
