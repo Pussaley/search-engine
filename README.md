@@ -42,11 +42,11 @@ ____
 
 - <span style="font-size: 25px">Dashboard</span><br>
   Статистика и статус индексируемых сайтов.
-  - <span style="font-size: 25px">Management</span><br>
+- <span style="font-size: 25px">Management</span><br>
     Инструменты управления поисковым движком:
       - <button style="background: #177db8">start/stop indexing</button> - запуск/остановка полной индексации
       - <button style="background: #177db8">add/update</button> - добавление отдельной страницы в индекс
-  - <span style="font-size: 25px">Search</span><br>
+- <span style="font-size: 25px">Search</span><br>
       <div style="text-align: justify">Эта страница предназначена для тестирования поискового движка. 
       Присутствует выпадающий список с выбором сайта для поиска.
       При нажатии на кнопку «Найти» выводятся результаты поиска.</div>
