@@ -14,8 +14,8 @@ ____
   Статистика и статус индексируемых сайтов.
 - <span style="font-size: 25px">Management</span><br>
     Инструменты управления поисковым движком:
-  - <button style="background: #177db8">start/stop indexing</button> - запуск/остановка полной индексации
-  - <button style="background: #177db8">add/update</button> - добавление отдельной страницы в индекс
+  - start/stop indexing - запуск/остановка полной индексации
+  - add/update - добавление отдельной страницы в индекс
 - <span style="font-size: 25px">Search</span><br>
       <div style="text-align: justify">Эта страница предназначена для тестирования поискового движка. 
       Присутствует выпадающий список с выбором сайта для поиска.
@@ -72,7 +72,6 @@ ____
 <details> <summary>Через IntelliJ IDEA</summary>
 
 1. Клонирование репозитория через IntelliJ IDEA:
-
    1. Запустите IntelliJ IDEA
    2. Выберите File → New → Project from Version Control
    3. Введите URL репозитория:
