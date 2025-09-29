@@ -113,4 +113,16 @@ public class DataSearchDAO {
                 .getSingleResult();
         return count.intValue();
     }
+
+    public List<IndexDto> findIndexesByLemmaId(Long lemmaId) {
+        return entityManager
+                .createQuery("select i from IndexEntity as i where i.lemma.id = :lemmaId",
+                        IndexEntity.class)
+                .setParameter("lemmaId", lemmaId)
+                .getResultList()
+                .stream()
+                .filter(Objects::nonNull)
+                .map(indexMapper::toDto)
+                .toList();
+    }
 }

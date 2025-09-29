@@ -5,11 +5,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
+import searchengine.model.dto.response.search.PageWithRelevanceResponse;
+import searchengine.model.dto.search.PageWithRelevance;
+import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.DataSearchDAO;
-import searchengine.model.dto.response.search.PageWithRelevanceResponse;
-import searchengine.model.dto.search.PageWithRelevance;
+import searchengine.service.search.demo.relevance.Demo;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
@@ -93,7 +95,8 @@ public class DataSearchService {
                 .map(mr -> new MatchResult(mr.start(), mr.end(), mr.group(1), mr.group()))
                 .collect(Collectors.toList());
 
-        if (matches.isEmpty()) return text.length() <= snippetLength ? text : text.substring(0, snippetLength - 3) + "...";
+        if (matches.isEmpty())
+            return text.length() <= snippetLength ? text : text.substring(0, snippetLength - 3) + "...";
 
         int totalHighlightedLength = matches.stream()
                 .mapToInt(match -> match.fullTag.length())
@@ -193,9 +196,26 @@ public class DataSearchService {
         }
     }
 
-    private String formTitle(String content) {
-        Matcher matcher = Pattern.compile("<title>(.*?)</title>", Pattern.DOTALL).matcher(content);
-        return matcher.find() ? matcher.group(1) : "Заголовок отсутствует";
+    public List<?> test(String query, String siteUrl) {
+
+
+        List<String> lemmas = getLemmasFromQuery(query);
+        Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
+
+        List<LemmaDto> foundLemmaDtos = new ArrayList<>();
+        lemmas.forEach(l -> dao.findLemmasByLemmaAndSiteId(l, siteId).ifPresent(
+                lemmaDto -> {
+                    Integer pagesCount = dao.countPagesBySiteId(siteId);
+                    if (lemmaDto.getFrequency() < pagesCount * 0.75)
+                        foundLemmaDtos.add(lemmaDto);
+                })
+        );
+        List<IndexDto> indexes = new ArrayList<>();
+        foundLemmaDtos.forEach(l -> indexes.addAll(dao.findIndexesByLemmaId(l.getId())));
+
+        Demo demo = new Demo(Map.of());
+
+        return List.of();
     }
 
     public List<PageWithRelevanceResponse> searchAsList(String query, String siteUrl) {
@@ -223,9 +243,8 @@ public class DataSearchService {
             LemmaDto lemmaDto = lemmaDtosArray[i];
             if (i == 0)
                 pages.addAll(dao.findPagesByLemmaAndSiteId(lemmaDto.getLemma(), lemmaDto.getSite().getId()));
-            else {
+            else
                 pages = dao.findPagesByLemmaAndSiteId(lemmaDto.getLemma(), lemmaDto.getSite().getId(), pages);
-            }
         }
 
         if (pages.isEmpty()) return Collections.emptyList();
@@ -241,7 +260,7 @@ public class DataSearchService {
 
                     return new PageWithRelevanceResponse(
                             page.getPath(),
-                            formTitle(content),
+                            textUtils.formTitle(content),
                             formSnippetTest(content, query),
                             relRelevance);
                 })

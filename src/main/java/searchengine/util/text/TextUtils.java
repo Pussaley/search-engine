@@ -2,6 +2,9 @@ package searchengine.util.text;
 
 import org.springframework.stereotype.Component;
 
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
 @Component
 public class TextUtils {
     public String clearFromHTMLTags(String text) {
@@ -26,5 +29,10 @@ public class TextUtils {
                 .replaceAll("\\s+", " ")
                 .trim()
                 .split("\\s+");
+    }
+
+    public String formTitle(String content) {
+        Matcher matcher = Pattern.compile("<title>(.*?)</title>", Pattern.DOTALL).matcher(content);
+        return matcher.find() ? matcher.group(1) : "Заголовок отсутствует";
     }
 }
