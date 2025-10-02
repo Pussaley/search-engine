@@ -7,11 +7,9 @@ import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.model.dto.response.search.PageWithRelevanceResponse;
 import searchengine.model.dto.search.PageWithRelevance;
-import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.DataSearchDAO;
-import searchengine.service.search.demo.relevance.Demo;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
@@ -19,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,12 +35,12 @@ public class DataSearchService {
     private final LemmaFinder lemmaFinder;
     private final SitesList sites;
     private final TextUtils textUtils;
+    private final double MAX_LEMMA_FREQUENCY_PERCENTAGE = 0.75;
 
     public Map<Site, List<PageWithRelevanceResponse>> searchAsMap(String query, String siteUrl) {
         return sites.getSites().stream()
                 .filter(site -> site.getUrl().equalsIgnoreCase(siteUrl))
-                .findFirst()
-                .stream()
+                .findFirst().stream()
                 .collect(Collectors.toMap(Function.identity(),
                         (site) -> searchAsList(query, site.getUrl())));
     }
@@ -198,24 +197,23 @@ public class DataSearchService {
 
     public List<?> test(String query, String siteUrl) {
 
-
         List<String> lemmas = getLemmasFromQuery(query);
         Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
 
-        List<LemmaDto> foundLemmaDtos = new ArrayList<>();
-        lemmas.forEach(l -> dao.findLemmasByLemmaAndSiteId(l, siteId).ifPresent(
-                lemmaDto -> {
-                    Integer pagesCount = dao.countPagesBySiteId(siteId);
-                    if (lemmaDto.getFrequency() < pagesCount * 0.75)
-                        foundLemmaDtos.add(lemmaDto);
-                })
-        );
-        List<IndexDto> indexes = new ArrayList<>();
-        foundLemmaDtos.forEach(l -> indexes.addAll(dao.findIndexesByLemmaId(l.getId())));
+        List<LemmaDto> lemmasOrderedByFrequency =
+                dao.findLemmasOrderByFrequency(siteId, lemmas).stream()
+                        .filter(l -> tooManyFrequency(siteId, l))
+                        .toList();
 
-        Demo demo = new Demo(Map.of());
+        if (lemmasOrderedByFrequency.isEmpty()) return Collections.emptyList();
+
+        Iterator<LemmaDto> it = lemmasOrderedByFrequency.iterator();
 
         return List.of();
+    }
+
+    private boolean tooManyFrequency(Long siteId, LemmaDto lemmaDto) {
+        return lemmaDto.getFrequency() < dao.countPagesBySiteId(siteId) * MAX_LEMMA_FREQUENCY_PERCENTAGE;
     }
 
     public List<PageWithRelevanceResponse> searchAsList(String query, String siteUrl) {
