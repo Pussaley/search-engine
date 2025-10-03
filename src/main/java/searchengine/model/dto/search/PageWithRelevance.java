@@ -1,12 +1,14 @@
 package searchengine.model.dto.search;
 
 import lombok.Data;
+import lombok.extern.slf4j.Slf4j;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.PageDto;
 
 import java.util.List;
 
 @Data
+@Slf4j
 public class PageWithRelevance {
     private static float max_relevance = 0;
     private final PageDto page;

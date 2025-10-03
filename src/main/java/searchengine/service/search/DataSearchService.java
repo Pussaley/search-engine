@@ -5,11 +5,11 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
+import searchengine.model.dto.response.search.PageWithRelevanceResponse;
+import searchengine.model.dto.search.PageWithRelevance;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.DataSearchDAO;
-import searchengine.model.dto.response.search.PageWithRelevanceResponse;
-import searchengine.model.dto.search.PageWithRelevance;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
@@ -17,6 +17,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,12 +35,12 @@ public class DataSearchService {
     private final LemmaFinder lemmaFinder;
     private final SitesList sites;
     private final TextUtils textUtils;
+    private final double MAX_LEMMA_FREQUENCY_PERCENTAGE = 0.75;
 
     public Map<Site, List<PageWithRelevanceResponse>> searchAsMap(String query, String siteUrl) {
         return sites.getSites().stream()
                 .filter(site -> site.getUrl().equalsIgnoreCase(siteUrl))
-                .findFirst()
-                .stream()
+                .findFirst().stream()
                 .collect(Collectors.toMap(Function.identity(),
                         (site) -> searchAsList(query, site.getUrl())));
     }
@@ -93,7 +94,8 @@ public class DataSearchService {
                 .map(mr -> new MatchResult(mr.start(), mr.end(), mr.group(1), mr.group()))
                 .collect(Collectors.toList());
 
-        if (matches.isEmpty()) return text.length() <= snippetLength ? text : text.substring(0, snippetLength - 3) + "...";
+        if (matches.isEmpty())
+            return text.length() <= snippetLength ? text : text.substring(0, snippetLength - 3) + "...";
 
         int totalHighlightedLength = matches.stream()
                 .mapToInt(match -> match.fullTag.length())
@@ -193,9 +195,25 @@ public class DataSearchService {
         }
     }
 
-    private String formTitle(String content) {
-        Matcher matcher = Pattern.compile("<title>(.*?)</title>", Pattern.DOTALL).matcher(content);
-        return matcher.find() ? matcher.group(1) : "Заголовок отсутствует";
+    public List<?> test(String query, String siteUrl) {
+
+        List<String> lemmas = getLemmasFromQuery(query);
+        Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
+
+        List<LemmaDto> lemmasOrderedByFrequency =
+                dao.findLemmasOrderByFrequency(siteId, lemmas).stream()
+                        .filter(l -> tooManyFrequency(siteId, l))
+                        .toList();
+
+        if (lemmasOrderedByFrequency.isEmpty()) return Collections.emptyList();
+
+        Iterator<LemmaDto> it = lemmasOrderedByFrequency.iterator();
+
+        return List.of();
+    }
+
+    private boolean tooManyFrequency(Long siteId, LemmaDto lemmaDto) {
+        return lemmaDto.getFrequency() < dao.countPagesBySiteId(siteId) * MAX_LEMMA_FREQUENCY_PERCENTAGE;
     }
 
     public List<PageWithRelevanceResponse> searchAsList(String query, String siteUrl) {
@@ -223,9 +241,8 @@ public class DataSearchService {
             LemmaDto lemmaDto = lemmaDtosArray[i];
             if (i == 0)
                 pages.addAll(dao.findPagesByLemmaAndSiteId(lemmaDto.getLemma(), lemmaDto.getSite().getId()));
-            else {
+            else
                 pages = dao.findPagesByLemmaAndSiteId(lemmaDto.getLemma(), lemmaDto.getSite().getId(), pages);
-            }
         }
 
         if (pages.isEmpty()) return Collections.emptyList();
@@ -241,7 +258,7 @@ public class DataSearchService {
 
                     return new PageWithRelevanceResponse(
                             page.getPath(),
-                            formTitle(content),
+                            textUtils.formTitle(content),
                             formSnippetTest(content, query),
                             relRelevance);
                 })

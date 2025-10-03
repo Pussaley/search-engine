@@ -69,8 +69,7 @@ public class ApiController {
         try {
             Map<Site, List<PageWithRelevanceResponse>> results =
                     site == null
-                            ? sitesList.getSites()
-                                    .parallelStream()
+                            ? sitesList.getSites().parallelStream()
                                     .collect(Collectors.toMap(Function.identity(), (s) -> dataSearchService.searchAsList(query, s.getUrl())))
                             : dataSearchService.searchAsMap(query, site);
 

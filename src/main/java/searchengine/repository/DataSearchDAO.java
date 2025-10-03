@@ -63,8 +63,7 @@ public class DataSearchDAO {
                         PageEntity.class)
                 .setParameter("lemma", lemma)
                 .setParameter("siteId", siteId)
-                .getResultList()
-                .stream()
+                .getResultList().stream()
                 .filter(Objects::nonNull)
                 .map(pageMapper::toDto)
                 .toList();
@@ -85,8 +84,7 @@ public class DataSearchDAO {
                 .setParameter("lemma", lemma)
                 .setParameter("siteId", siteId)
                 .setParameter("pageIds", pagesIds)
-                .getResultList()
-                .stream()
+                .getResultList().stream()
                 .filter(Objects::nonNull)
                 .map(pageMapper::toDto)
                 .toList();
@@ -94,14 +92,15 @@ public class DataSearchDAO {
 
     public List<IndexDto> findIndexesByPageIdAndLemmas(Long pageId, List<String> lemmas) {
         return entityManager.createQuery("""
-                                select i from IndexEntity as i
-                                where i.page.id = :pageId and i.lemma.lemma in :lemmas
+                                select i 
+                                from IndexEntity as i
+                                where i.page.id = :pageId and i.lemma.lemma 
+                                in :lemmas
                                 """,
                         IndexEntity.class)
                 .setParameter("pageId", pageId)
                 .setParameter("lemmas", lemmas)
-                .getResultList()
-                .stream()
+                .getResultList().stream()
                 .filter(Objects::nonNull)
                 .map(indexMapper::toDto)
                 .toList();
@@ -112,5 +111,51 @@ public class DataSearchDAO {
                 .setParameter(1, siteId)
                 .getSingleResult();
         return count.intValue();
+    }
+
+    public List<IndexDto> findIndexesByLemmaId(Long lemmaId) {
+        return entityManager
+                .createQuery("""
+                                select i 
+                                from IndexEntity as i 
+                                where i.lemma.id = :lemmaId""",
+                        IndexEntity.class)
+                .setParameter("lemmaId", lemmaId)
+                .getResultList().stream()
+                .filter(Objects::nonNull)
+                .map(indexMapper::toDto)
+                .toList();
+    }
+
+    public List<LemmaDto> findLemmasOrderByFrequency(Long siteId, List<String> lemmas) {
+        return entityManager.createQuery("""
+                                select l 
+                                from LemmaEntity as l 
+                                where l.lemma in (:lemmas) and l.site.id = :siteId 
+                                order by l.frequency""",
+                        LemmaEntity.class)
+                .setParameter("lemmas", lemmas)
+                .setParameter("siteId", siteId)
+                .getResultList().stream()
+                .filter(Objects::nonNull)
+                .map(lemmaMapper::toDto)
+                .toList();
+    }
+
+    public List<PageDto> findPagesByLemmaId(Long lemmaId) {
+
+        return entityManager.createQuery("""
+                                select p.id 
+                                from PageEntity as p 
+                                where id in (
+                                            select i.page.id 
+                                            from IndexEntity as i 
+                                            where i.lemma.id = :lemmaId)""",
+                        PageEntity.class)
+                .setParameter("lemmaId", lemmaId)
+                .getResultList().stream()
+                .filter(Objects::nonNull)
+                .map(pageMapper::toDto)
+                .toList();
     }
 }
