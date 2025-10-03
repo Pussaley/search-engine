@@ -145,9 +145,9 @@ public class DataSearchDAO {
     public List<PageDto> findPagesByLemmaId(Long lemmaId) {
 
         return entityManager.createQuery("""
-                                select p.id 
+                                select p
                                 from PageEntity as p 
-                                where id in (
+                                where p.id in (
                                             select i.page.id 
                                             from IndexEntity as i 
                                             where i.lemma.id = :lemmaId)""",

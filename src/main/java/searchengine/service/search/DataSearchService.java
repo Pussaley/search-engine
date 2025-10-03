@@ -13,15 +13,7 @@ import searchengine.repository.DataSearchDAO;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.Iterator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.TreeSet;
+import java.util.*;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -42,7 +34,7 @@ public class DataSearchService {
                 .filter(site -> site.getUrl().equalsIgnoreCase(siteUrl))
                 .findFirst().stream()
                 .collect(Collectors.toMap(Function.identity(),
-                        (site) -> searchAsList(query, site.getUrl())));
+                        (site) -> test(query, site.getUrl())));
     }
 
     private String formSnippetTest(String content, String query) {
@@ -80,7 +72,6 @@ public class DataSearchService {
 
         return !resultContent.isEmpty() ? processText(resultContent) : emptySnippet;
     }
-
 
     public static String processText(String text) {
 
@@ -157,7 +148,6 @@ public class DataSearchService {
         }
     }
 
-
     private static String truncateHighlightedText(List<MatchResult> matches, int maxLength) {
         StringBuilder result = new StringBuilder();
         int remainingLength = maxLength;
@@ -195,25 +185,42 @@ public class DataSearchService {
         }
     }
 
-    public List<?> test(String query, String siteUrl) {
+    public List<PageWithRelevanceResponse> test(String query, String siteUrl) {
 
         List<String> lemmas = getLemmasFromQuery(query);
         Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
+        Integer pagesCount = dao.countPagesBySiteId(siteId);
 
         List<LemmaDto> lemmasOrderedByFrequency =
-                dao.findLemmasOrderByFrequency(siteId, lemmas).stream()
-                        .filter(l -> tooManyFrequency(siteId, l))
-                        .toList();
+                dao.findLemmasOrderByFrequency(siteId, lemmas);
 
-        if (lemmasOrderedByFrequency.isEmpty()) return Collections.emptyList();
+        List<LemmaDto> list = lemmasOrderedByFrequency.stream()
+                .filter(l -> checkLemmaFrequencyLessThreshold(l, pagesCount))
+                .peek(l -> log.info("Лемма {} сайта {} прошла фильтрацию", l.getLemma(), l.getSite().getName()))
+                .toList();
 
-        Iterator<LemmaDto> it = lemmasOrderedByFrequency.iterator();
+        if (list.isEmpty()) return Collections.emptyList();
+
+        Map<LemmaDto, List<PageDto>> pagesMap = list.stream()
+                .collect(Collectors.toMap(
+                        Function.identity(),
+                        l -> dao.findPagesByLemmaId(l.getId())));
+
+        Set<PageDto> result = new HashSet<>();
+        Set<Map.Entry<LemmaDto, List<PageDto>>> entries = pagesMap.entrySet();
+        for (Map.Entry<LemmaDto, List<PageDto>> entry : entries) {
+            List<PageDto> pages = new ArrayList<>(entry.getValue());
+            pages.retainAll(result);
+            result.addAll(pages);
+        }
+
+        log.info("Количество страниц: {}", result.size());
 
         return List.of();
     }
 
-    private boolean tooManyFrequency(Long siteId, LemmaDto lemmaDto) {
-        return lemmaDto.getFrequency() < dao.countPagesBySiteId(siteId) * MAX_LEMMA_FREQUENCY_PERCENTAGE;
+    private boolean checkLemmaFrequencyLessThreshold(LemmaDto lemmaDto, int pagesCount) {
+        return lemmaDto.getFrequency() < pagesCount * MAX_LEMMA_FREQUENCY_PERCENTAGE;
     }
 
     public List<PageWithRelevanceResponse> searchAsList(String query, String siteUrl) {
