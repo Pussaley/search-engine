@@ -13,7 +13,11 @@ import searchengine.repository.DataSearchDAO;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
-import java.util.*;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -34,7 +38,7 @@ public class DataSearchService {
                 .filter(site -> site.getUrl().equalsIgnoreCase(siteUrl))
                 .findFirst().stream()
                 .collect(Collectors.toMap(Function.identity(),
-                        (site) -> test(query, site.getUrl())));
+                        (site) -> findRelevancedPages(query, site.getUrl())));
     }
 
     private String formSnippetTest(String content, String query) {
@@ -185,91 +189,55 @@ public class DataSearchService {
         }
     }
 
-    public List<PageWithRelevanceResponse> test(String query, String siteUrl) {
+    public List<PageWithRelevanceResponse> findRelevancedPages(String query, String siteUrl) {
 
         List<String> lemmas = getLemmasFromQuery(query);
         Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
         Integer pagesCount = dao.countPagesBySiteId(siteId);
 
-        List<LemmaDto> lemmasOrderedByFrequency =
-                dao.findLemmasOrderByFrequency(siteId, lemmas);
-
-        List<LemmaDto> list = lemmasOrderedByFrequency.stream()
-                .filter(l -> checkLemmaFrequencyLessThreshold(l, pagesCount))
-                .peek(l -> log.info("Лемма {} сайта {} прошла фильтрацию", l.getLemma(), l.getSite().getName()))
-                .toList();
+        List<LemmaDto> list = findLemmaDtosSortedByFrequency(siteId, lemmas, pagesCount);
 
         if (list.isEmpty()) return Collections.emptyList();
 
-        Map<LemmaDto, List<PageDto>> pagesMap = list.stream()
-                .collect(Collectors.toMap(
-                        Function.identity(),
-                        l -> dao.findPagesByLemmaId(l.getId())));
+        Iterator<LemmaDto> it = list.iterator();
+        List<PageDto> pages = dao.findPagesByLemmaId(it.next().getId());
 
-        Set<PageDto> result = new HashSet<>();
-        Set<Map.Entry<LemmaDto, List<PageDto>>> entries = pagesMap.entrySet();
-        for (Map.Entry<LemmaDto, List<PageDto>> entry : entries) {
-            List<PageDto> pages = new ArrayList<>(entry.getValue());
-            pages.retainAll(result);
-            result.addAll(pages);
-        }
+        while (it.hasNext())
+            pages = dao.findPagesByLemmaIdInPages(it.next().getId(), pages.stream().map(PageDto::getId).toList());
 
-        log.info("Количество страниц: {}", result.size());
+        return pages.isEmpty() ? Collections.emptyList() : convertPagesIntoRelevancedPages(query, pages, lemmas);
+    }
 
-        return List.of();
+    private List<PageWithRelevanceResponse> convertPagesIntoRelevancedPages(String query, List<PageDto> pages, List<String> lemmas) {
+        List<PageWithRelevance> result = pages.stream()
+                .map( page -> new PageWithRelevance(page, dao.findIndexesByPageIdAndLemmas(page.getId(), lemmas))
+                ).toList();
+
+        return result.stream()
+                .map(pageWithRelevance -> {
+                    String content = pageWithRelevance.getPage().getContent();
+
+                    return new PageWithRelevanceResponse(
+                            pageWithRelevance.getPage().getPath(),
+                            textUtils.formTitle(content),
+                            formSnippetTest(content, query),
+                            pageWithRelevance.getRelRelevance());})
+                .toList();
+    }
+
+    private List<LemmaDto> findLemmaDtosSortedByFrequency(Long siteId, List<String> lemmas, Integer pagesCount) {
+        List<LemmaDto> lemmasOrderedByFrequency =
+                dao.findLemmasOrderByFrequency(siteId, lemmas);
+
+        List<LemmaDto> result = lemmasOrderedByFrequency.stream()
+                .filter(l -> checkLemmaFrequencyLessThreshold(l, pagesCount))
+                .toList();
+
+        return result.size() == lemmas.size() ? result : Collections.emptyList();
     }
 
     private boolean checkLemmaFrequencyLessThreshold(LemmaDto lemmaDto, int pagesCount) {
         return lemmaDto.getFrequency() < pagesCount * MAX_LEMMA_FREQUENCY_PERCENTAGE;
-    }
-
-    public List<PageWithRelevanceResponse> searchAsList(String query, String siteUrl) {
-
-        List<String> lemmas = getLemmasFromQuery(query);
-
-        Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
-        List<LemmaDto> resultLemmas = new ArrayList<>();
-        lemmas.forEach(l -> dao.findLemmasByLemmaAndSiteId(l, siteId).ifPresent(
-                lemmaDto -> {
-                    Integer pagesCount = dao.countPagesBySiteId(siteId);
-                    if (lemmaDto.getFrequency() < pagesCount * 0.75)
-                        resultLemmas.add(lemmaDto);
-                })
-        );
-
-        if (resultLemmas.isEmpty()) return Collections.emptyList();
-
-        Set<LemmaDto> sortedLemmas = new TreeSet<>(Comparator.comparing(LemmaDto::getFrequency));
-        sortedLemmas.addAll(resultLemmas);
-
-        LemmaDto[] lemmaDtosArray = sortedLemmas.toArray(LemmaDto[]::new);
-        List<PageDto> pages = new ArrayList<>();
-        for (int i = 0; i < lemmaDtosArray.length; i++) {
-            LemmaDto lemmaDto = lemmaDtosArray[i];
-            if (i == 0)
-                pages.addAll(dao.findPagesByLemmaAndSiteId(lemmaDto.getLemma(), lemmaDto.getSite().getId()));
-            else
-                pages = dao.findPagesByLemmaAndSiteId(lemmaDto.getLemma(), lemmaDto.getSite().getId(), pages);
-        }
-
-        if (pages.isEmpty()) return Collections.emptyList();
-
-        List<PageWithRelevance> result = new ArrayList<>();
-        for (PageDto page : pages)
-            result.add(new PageWithRelevance(page, dao.findIndexesByPageIdAndLemmas(page.getId(), lemmas)));
-
-        return result.stream().map(pageWithRelevance -> {
-                    PageDto page = pageWithRelevance.getPage();
-                    float relRelevance = pageWithRelevance.getRelRelevance();
-                    String content = page.getContent();
-
-                    return new PageWithRelevanceResponse(
-                            page.getPath(),
-                            textUtils.formTitle(content),
-                            formSnippetTest(content, query),
-                            relRelevance);
-                })
-                .toList();
     }
 
     private List<String> getLemmasFromQuery(String query) {

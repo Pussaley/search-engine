@@ -3,7 +3,11 @@ package searchengine.controller.rest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.model.dto.response.indexing.ResponseErrorMessageDto;
@@ -72,7 +76,7 @@ public class ApiController {
                             ? sitesList.getSites().stream()
                                     .collect(Collectors.toMap(
                                             Function.identity(),
-                                            (s) -> dataSearchService.test(query, s.getUrl())))
+                                            (s) -> dataSearchService.findRelevancedPages(query, s.getUrl())))
                             : dataSearchService.searchAsMap(query, site);
 
             Long totalCount = results.values()
