@@ -20,4 +20,8 @@ public class UrlNormalizer {
             return input.toLowerCase();
         }
     }
+
+    public String appendTrailingSlashIfNeeded(String url) {
+        return url.endsWith(".html") ? url : url.endsWith("/") ? url : url.concat("/");
+    }
 }

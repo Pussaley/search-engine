@@ -13,7 +13,7 @@ public interface LemmaRepository extends JpaRepository<LemmaEntity, Long> {
     @Query(
             nativeQuery = true,
             value = "select * from lemmas as l where l.lemma = ? and  l.site_id = ?")
-    Optional<LemmaEntity> findByLemmaAndSiteId(String lemma, Long id);
+    Optional<LemmaEntity> findByLemmaAndSiteId(String lemma, Long siteId);
 
     @Modifying
     @Query(

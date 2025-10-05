@@ -231,7 +231,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         try {
             LocalDateTime started = LocalDateTime.now();
             log.info("[Time: {}] - Запущена индексация сайта {}.", started, siteName);
-            fjp.invoke(new RecursiveSiteCrawler(s, url, jsoupParser, siteService, pageService, lemmaProcessor, true));
+            fjp.invoke(new RecursiveSiteCrawler(s, url, jsoupParser, siteService, pageService, lemmaProcessor, urlNormalizer, true));
             LocalDateTime ended = LocalDateTime.now();
             log.info("[Time: {}] - Индексация сайта {} завершена.", ended, siteName);
             log.info("Длительность индексации: {} секунд.", Duration.between(started, ended).toSeconds());

@@ -15,6 +15,7 @@ import searchengine.service.crud.impl.PageServiceCRUDImpl;
 import searchengine.service.crud.impl.SiteServiceCRUDImpl;
 import searchengine.service.morphology.LemmaProcessor;
 import searchengine.util.jsoup.JSOUPParser;
+import searchengine.util.url.UrlNormalizer;
 
 import java.net.SocketTimeoutException;
 import java.util.Collections;
@@ -37,6 +38,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     private final SiteServiceCRUDImpl siteService;
     private final PageServiceCRUDImpl pageService;
     private final LemmaProcessor lemmaProcessor;
+    private final UrlNormalizer urlNormalizer;
     @Setter
     private static volatile boolean cancelRecursiveTask = false;
     @Getter
@@ -50,8 +52,8 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                                 JSOUPParser jsoupParser,
                                 SiteServiceCRUDImpl siteService,
                                 PageServiceCRUDImpl pageService,
-                                LemmaProcessor lemmaProcessor) {
-        this(siteDto, url, jsoupParser, siteService, pageService, lemmaProcessor, false);
+                                LemmaProcessor lemmaProcessor, UrlNormalizer urlNormalizer) {
+        this(siteDto, url, jsoupParser, siteService, pageService, lemmaProcessor, urlNormalizer, false);
     }
 
     public RecursiveSiteCrawler(SiteDto siteDto,
@@ -60,6 +62,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                                 SiteServiceCRUDImpl siteService,
                                 PageServiceCRUDImpl pageService,
                                 LemmaProcessor lemmaProcessor,
+                                UrlNormalizer urlNormalizer,
                                 boolean newIndexing) {
         this.siteDto = siteDto;
         this.url = url;
@@ -67,6 +70,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         this.siteService = siteService;
         this.pageService = pageService;
         this.lemmaProcessor = lemmaProcessor;
+        this.urlNormalizer = urlNormalizer;
         this.newIndexing = newIndexing;
 
         if (newIndexing)
@@ -85,17 +89,13 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         Set<String> strings = document.select(cssSelector).stream()
                 .map(e -> e.attr("abs:href"))
                 .filter(e -> e.startsWith(siteDto.getUrl()))
-                .map(this::repairUrl)
+                .map(urlNormalizer::appendTrailingSlashIfNeeded)
                 .filter(parsedPages::add)
                 .collect(Collectors.toCollection(HashSet::new));
 
         strings.addAll(pages);
 
         return strings;
-    }
-
-    private String repairUrl(String url) {
-        return url.endsWith(".html") ? url : url.endsWith("/") ? url : url.concat("/");
     }
 
     private Set<String> findPagination(Document document) {
@@ -114,8 +114,8 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         String uri = (baseUri.contains("page="))
                 ? baseUri.replaceFirst("page=\\d+", "page=")
                 : baseUri.endsWith("/")
-                        ? baseUri.concat("page=")
-                        : baseUri.concat("/page=");
+                ? baseUri.concat("page=")
+                : baseUri.concat("/page=");
 
         return elements.stream()
                 .map(Element::text)
@@ -141,20 +141,22 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             String rawPath = this.url.replaceFirst(siteDto.getUrl(), "");
             final String finalRawPath = rawPath.isEmpty() ? "/" : rawPath;
 
-            ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(rawPath, k -> new ReentrantLock());
-            pageLock.lockInterruptibly();
+            ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(finalRawPath, k -> new ReentrantLock());
+            RecursiveSiteCrawler[] tasksList = new RecursiveSiteCrawler[pages.size()];
+
             try {
-                PageDto pageDto = pageService.findByPathAndSiteId(rawPath, siteDto.getId())
-                        .orElseGet(() -> PageDto.builder()
-                                .site(siteDto)
-                                .content(document.html())
-                                .path(finalRawPath)
-                                .code(statusCode).build());
+                pageLock.lockInterruptibly();
+                if (pageService.findByPathAndSiteId(finalRawPath, siteDto.getId()).isEmpty()) {
+                    PageDto pageDto = PageDto.builder()
+                            .site(siteDto)
+                            .content(document.html())
+                            .path(finalRawPath)
+                            .code(statusCode).build();
 
-                PageDto savedPage = pageService.save(pageDto);
-                lemmaProcessor.processLemmas(siteDto, savedPage);
+                    PageDto savedPage = pageService.save(pageDto);
+                    lemmaProcessor.processLemmas(siteDto, savedPage);
+                }
 
-                RecursiveSiteCrawler[] tasksList = new RecursiveSiteCrawler[pages.size()];
                 int p = 0;
                 for (String page : pages) {
                     if (Thread.interrupted())
@@ -166,11 +168,11 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                             jsoupParser,
                             siteService,
                             pageService,
-                            lemmaProcessor);
+                            lemmaProcessor, urlNormalizer);
                 }
-                if (tasksList.length > 0) ForkJoinTask.invokeAll(tasksList);
             } finally {
                 pageLock.unlock();
+                if (tasksList.length > 0) ForkJoinTask.invokeAll(tasksList);
             }
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
