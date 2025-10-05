@@ -27,7 +27,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 @Slf4j
 public class DataSearchService {
-    private final DataSearchDAO dao;
+    private final DataSearchDAO searchDAO;
     private final LemmaFinder lemmaFinder;
     private final SitesList sites;
     private final TextUtils textUtils;
@@ -41,7 +41,7 @@ public class DataSearchService {
                         (site) -> findRelevancedPages(query, site.getUrl())));
     }
 
-    private String formSnippetTest(String content, String query) {
+    private String formTextSnippet(String content, String query) {
 
         final String emptySnippet = "Пустой сниппет";
         final String openingBTag = "<b>";
@@ -192,26 +192,26 @@ public class DataSearchService {
     public List<PageWithRelevanceResponse> findRelevancedPages(String query, String siteUrl) {
 
         List<String> lemmas = getLemmasFromQuery(query);
-        Long siteId = dao.getSiteIdBySiteUrl(siteUrl);
-        Integer pagesCount = dao.countPagesBySiteId(siteId);
+        Long siteId = searchDAO.getSiteIdBySiteUrl(siteUrl);
+        Integer pagesCount = searchDAO.countPagesBySiteId(siteId);
 
         List<LemmaDto> list = findLemmaDtosSortedByFrequency(siteId, lemmas, pagesCount);
 
         if (list.isEmpty()) return Collections.emptyList();
 
         Iterator<LemmaDto> it = list.iterator();
-        List<PageDto> pages = dao.findPagesByLemmaId(it.next().getId());
+        List<PageDto> pages = searchDAO.findPagesByLemmaId(it.next().getId());
 
         while (it.hasNext())
-            pages = dao.findPagesByLemmaIdInPages(it.next().getId(), pages.stream().map(PageDto::getId).toList());
+            pages = searchDAO.findPagesByLemmaIdInPages(it.next().getId(), pages.stream().map(PageDto::getId).toList());
 
         return pages.isEmpty() ? Collections.emptyList() : convertPagesIntoRelevancedPages(query, pages, lemmas);
     }
 
     private List<PageWithRelevanceResponse> convertPagesIntoRelevancedPages(String query, List<PageDto> pages, List<String> lemmas) {
         List<PageWithRelevance> result = pages.stream()
-                .map( page -> new PageWithRelevance(page, dao.findIndexesByPageIdAndLemmas(page.getId(), lemmas))
-                ).toList();
+                .map(page -> new PageWithRelevance(page, searchDAO.findIndexesByPageIdAndLemmas(page.getId(), lemmas)))
+                .toList();
 
         return result.stream()
                 .map(pageWithRelevance -> {
@@ -220,14 +220,15 @@ public class DataSearchService {
                     return new PageWithRelevanceResponse(
                             pageWithRelevance.getPage().getPath(),
                             textUtils.formTitle(content),
-                            formSnippetTest(content, query),
-                            pageWithRelevance.getRelRelevance());})
+                            formTextSnippet(content, query),
+                            pageWithRelevance.getRelRelevance());
+                })
                 .toList();
     }
 
     private List<LemmaDto> findLemmaDtosSortedByFrequency(Long siteId, List<String> lemmas, Integer pagesCount) {
         List<LemmaDto> lemmasOrderedByFrequency =
-                dao.findLemmasOrderByFrequency(siteId, lemmas);
+                searchDAO.findLemmasOrderByFrequency(siteId, lemmas);
 
         List<LemmaDto> result = lemmasOrderedByFrequency.stream()
                 .filter(l -> checkLemmaFrequencyLessThreshold(l, pagesCount))
