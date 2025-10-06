@@ -35,50 +35,18 @@ public class Demo {
         }
     }
 
-    public List<? extends Relevancing> getResult() {
+    public List<RelevancingPageRel> getResult() {
         return results.stream()
                 .map(p -> new RelevancingPageRel((RelevancingPageAbs) p, MaxRelevance.getValue()))
                 .toList();
     }
-}
 
-final class MaxRelevance {
-    @Getter
-    private static float value = 0;
+    static class MaxRelevance {
+        @Getter
+        private static float value = 0;
 
-    public static void save(float newVal) {
-        value = Math.max(value, newVal);
-    }
-}
-
-abstract class Relevancing {
-}
-
-final class RelevancingPageRel extends Relevancing {
-    private final String uri;
-    private final String title;
-    private final String snippet;
-    private final float relRelevance;
-
-    public RelevancingPageRel(RelevancingPageAbs relevancingPage, float absRelevance) {
-        this.uri = relevancingPage.getUri();
-        this.title = relevancingPage.getTitle();
-        this.snippet = relevancingPage.getSnippet();
-        this.relRelevance = relevancingPage.getRelRelevance() / absRelevance;
-    }
-}
-
-@Getter
-final class RelevancingPageAbs extends Relevancing {
-    private final String uri;
-    private final String title;
-    private final String snippet;
-    private final float relRelevance;
-
-    public RelevancingPageAbs(String uri, String title, String snippet, float relevance) {
-        this.uri = uri;
-        this.title = title;
-        this.snippet = snippet;
-        this.relRelevance = relevance;
+        public static void save(float newVal) {
+            value = Math.max(value, newVal);
+        }
     }
 }

@@ -20,6 +20,7 @@ import searchengine.service.search.DataSearchService;
 import searchengine.service.statistics.StatisticsService;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -93,10 +94,11 @@ public class ApiController {
                                     page.getTitle(),
                                     page.getSnippet(),
                                     page.getRelevance()))
-                            .sorted(Comparator.comparing(RelevanceData::getRelevance).reversed())
                             .skip(Long.parseLong(offset))
                             .limit(Long.parseLong(limit))
                             .forEach(data::add));
+
+            data.sort(Comparator.comparing(RelevanceData::getRelevance).reversed());
 
             return ResponseEntity.ok(new DataSearchResponse(true, totalCount.intValue(), data));
         } catch (Exception exception) {

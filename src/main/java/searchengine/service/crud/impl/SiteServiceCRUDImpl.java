@@ -49,11 +49,10 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
 
     }
 
-    public SiteDto update(SiteDto siteDto) {
+    public synchronized SiteDto update(SiteDto siteDto) {
         if (Objects.isNull(siteDto.getId()))
             throw new NullPointerException("Поле id не может быть пустым");
 
-        siteDto.setStatusTime(LocalDateTime.now());
         return siteMapper.toDTO(siteRepository.save(siteMapper.toEntity(siteDto)));
 
     }
@@ -95,7 +94,7 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
         });
     }
 
-    public void updateSiteStatusWithError(Long siteId, SiteStatus status, String error) {
+    public synchronized void updateSiteStatusWithError(Long siteId, SiteStatus status, String error) {
         entityManager.createNativeQuery("update sites as s set s.status = ?, s.status_time = now(), s.last_error = ? where s.id = ?")
                 .setParameter(1, status )
                 .setParameter(2, error)

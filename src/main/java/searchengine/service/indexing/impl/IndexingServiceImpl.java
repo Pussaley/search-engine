@@ -9,7 +9,7 @@ import org.springframework.transaction.annotation.Transactional;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.config.props.concurrency.ConcurrencyProperties;
-import searchengine.exception.SiteNotIndexedException;
+import searchengine.exception.IndexingCancelledByUserException;
 import searchengine.model.SiteStatus;
 import searchengine.model.dto.response.Response;
 import searchengine.model.dto.response.indexing.IndexingResultResponse;
@@ -119,14 +119,17 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         Throwable cause = ex.getCause();
         String errorDescription = Objects.nonNull(cause) ? cause.getMessage() : ex.getMessage();
 
-        if (cause instanceof SiteNotIndexedException exception)
-            log.error("Завершение индексации ошибкой: {}", exception.getMessage());
+        if (cause instanceof IndexingCancelledByUserException indexingCancelledByUserException)
+            log.error("Индексация сайта {} завершена пользователем.", siteName);
         else
-            log.error("Индексация завершена с неизвестной ошибкой: {}.", ex.getCause().getClass().getSimpleName());
+            log.error("Индексация сайта {} завершена внештатно, исключение: {}.", siteName, ex.getCause().getClass().getSimpleName());
 
         siteService.findByName(siteName).ifPresentOrElse(siteDto -> {
                     siteDto.setSiteStatus(failedStatus);
+                    siteDto.setStatusTime(LocalDateTime.now());
                     siteDto.setLastError(errorDescription);
+
+                    log.info("Сохраняем информацию о завершении индексации сайта {} с ошибкой: '{}'", siteDto.getName(), errorDescription);
                     siteService.update(siteDto);
                 },
                 () -> log.error("Сайт не найден: {}", siteName));
@@ -146,7 +149,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             Site site = optionalParentSite.get();
             CompletableFuture<IndexingResultResponse> completedPageIndexing = CompletableFuture.supplyAsync(() -> preparePage(site, url))
                     .thenApply(siteDto -> indexPageAsync(siteDto, url))
-                    .whenComplete((result, throwable) -> handlePageIndexingResult(site, result, throwable));
+                    .whenComplete((result, throwable) -> handlePageIndexingResult(site, throwable));
 
             CompletableFuture.allOf(completedPageIndexing)
                     .thenRunAsync(() -> log.info("Индексация страницы {} завершена", url), defaultIndexingExecutor);
@@ -157,7 +160,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
         return new ResponseErrorMessageDto(false, "Индексация уже запущена");
     }
 
-    private void handlePageIndexingResult(Site site, IndexingResultResponse result, Throwable throwable) {
+    private void handlePageIndexingResult(Site site, Throwable throwable) {
         try {
             Long siteId = siteService.findByName(site.getName()).map(SiteDto::getId).orElseThrow();
 
@@ -301,6 +304,7 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             return Optional.empty();
         }
     }
+
     private void clearResources() {
         activeForkJoinPools.clear();
         activeIndexingTasks.clear();

@@ -8,7 +8,7 @@ import org.jsoup.HttpStatusException;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
-import searchengine.exception.SiteNotIndexedException;
+import searchengine.exception.IndexingCancelledByUserException;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.crud.impl.PageServiceCRUDImpl;
@@ -129,7 +129,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             SiteDto site = SiteDto.builder().build();
             site.setName(siteDto.getName());
             site.setUrl(siteDto.getUrl());
-            throw new SiteNotIndexedException(site, "Индексация отменена пользователем");
+            throw new IndexingCancelledByUserException(site, "Индексация отменена пользователем");
         }
 
         try {
@@ -187,7 +187,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             SiteDto site = SiteDto.builder().build();
             site.setName(siteDto.getName());
             site.setUrl(siteDto.getUrl());
-            throw new SiteNotIndexedException(site, "Индексация отменена пользователем");
+            throw new IndexingCancelledByUserException(site, "Индексация отменена пользователем");
         } catch (Exception exception) {
             errorLogger(exception, this.url);
             errorSaving(RequestStatusCode.REQUEST_DENIED);

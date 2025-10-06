@@ -10,10 +10,14 @@ import searchengine.model.dto.search.PageWithRelevance;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.DataSearchDAO;
+import searchengine.service.search.demo.relevance.Demo;
+import searchengine.service.search.demo.relevance.Relevancing;
+import searchengine.service.search.demo.relevance.RelevancingPageRel;
 import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.text.TextUtils;
 
 import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.List;
@@ -205,7 +209,7 @@ public class DataSearchService {
         while (it.hasNext())
             pages = searchDAO.findPagesByLemmaIdInPages(it.next().getId(), pages.stream().map(PageDto::getId).toList());
 
-        return pages.isEmpty() ? Collections.emptyList() : convertPagesIntoRelevancedPages(query, pages, lemmas);
+        return pages.isEmpty() ? Collections.emptyList() : TESTconvertPagesIntoRelevancedPages(query, pages, lemmas);
     }
 
     private List<PageWithRelevanceResponse> convertPagesIntoRelevancedPages(String query, List<PageDto> pages, List<String> lemmas) {
@@ -224,6 +228,19 @@ public class DataSearchService {
                             pageWithRelevance.getRelRelevance());
                 })
                 .toList();
+    }
+
+    private List<PageWithRelevanceResponse> TESTconvertPagesIntoRelevancedPages(String query, List<PageDto> pages, List<String> lemmas) {
+        List<RelevancingPageRel> result = pages.stream()
+                .map(page -> {
+                    Demo demo = new Demo(Map.of(page, searchDAO.findIndexesByPageIdAndLemmas(page.getId(), lemmas)));
+                    return demo.getResult();
+                })
+                .flatMap(Collection::stream)
+                .toList();
+
+        return result.stream()
+                .map(PageWithRelevanceResponse::new).toList();
     }
 
     private List<LemmaDto> findLemmaDtosSortedByFrequency(Long siteId, List<String> lemmas, Integer pagesCount) {
