@@ -1,5 +1,6 @@
 package searchengine.service.recursive;
 
+import jakarta.persistence.EntityNotFoundException;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +10,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import searchengine.exception.IndexingCancelledByUserException;
+import searchengine.model.SiteStatus;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.model.entity.dto.SiteDto;
 import searchengine.service.crud.impl.PageServiceCRUDImpl;
@@ -18,9 +20,13 @@ import searchengine.util.jsoup.JSOUPParser;
 import searchengine.util.url.UrlNormalizer;
 
 import java.net.SocketTimeoutException;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ConcurrentHashMap;
@@ -126,10 +132,8 @@ public class RecursiveSiteCrawler extends RecursiveAction {
     @Override
     protected void compute() {
         if (Thread.currentThread().isInterrupted() || cancelRecursiveTask) {
-            SiteDto site = SiteDto.builder().build();
-            site.setName(siteDto.getName());
-            site.setUrl(siteDto.getUrl());
-            throw new IndexingCancelledByUserException(site, "Индексация отменена пользователем");
+            final String error = "Индексация отменена пользователем";
+            throw new IndexingCancelledByUserException(createCanceledSiteDtoWithStatus(SiteStatus.FAILED, error), error);
         }
 
         try {
@@ -142,7 +146,7 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             final String finalRawPath = rawPath.isEmpty() ? "/" : rawPath;
 
             ReentrantLock pageLock = PAGE_LOCKS.computeIfAbsent(finalRawPath, k -> new ReentrantLock());
-            RecursiveSiteCrawler[] tasksList = new RecursiveSiteCrawler[pages.size()];
+            List<RecursiveSiteCrawler> tasksList = new ArrayList<>();
 
             try {
                 pageLock.lockInterruptibly();
@@ -157,22 +161,25 @@ public class RecursiveSiteCrawler extends RecursiveAction {
                     lemmaProcessor.processLemmas(siteDto, savedPage);
                 }
 
-                int p = 0;
                 for (String page : pages) {
                     if (Thread.interrupted())
                         throw new InterruptedException();
 
-                    tasksList[p++] = new RecursiveSiteCrawler(
+                    tasksList.add(new RecursiveSiteCrawler(
                             siteDto,
                             page,
                             jsoupParser,
                             siteService,
                             pageService,
-                            lemmaProcessor, urlNormalizer);
+                            lemmaProcessor,
+                            urlNormalizer));
                 }
             } finally {
                 pageLock.unlock();
-                if (tasksList.length > 0) ForkJoinTask.invokeAll(tasksList);
+                if (!tasksList.isEmpty()) {
+                    tasksList.removeIf(Objects::isNull);
+                    ForkJoinTask.invokeAll(tasksList);
+                }
             }
         } catch (InterruptedException interruptedException) {
             Thread.currentThread().interrupt();
@@ -183,18 +190,34 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         } catch (HttpStatusException httpStatusException) {
             errorLogger(httpStatusException, httpStatusException.getUrl());
             errorSaving(RequestStatusCode.NOT_FOUND);
-        } catch (CancellationException cancellationException) {
-            SiteDto site = SiteDto.builder().build();
-            site.setName(siteDto.getName());
-            site.setUrl(siteDto.getUrl());
-            throw new IndexingCancelledByUserException(site, "Индексация отменена пользователем");
+        } catch (IndexingCancelledByUserException indexingCancelledByUserException) {
+            cancelRecursiveTask = true;
+            throw indexingCancelledByUserException;
+        } catch (CancellationException | IllegalMonitorStateException cancelException) {
+            final String error = "Индексация отменена пользователем";
+            throw new IndexingCancelledByUserException(createCanceledSiteDtoWithStatus(SiteStatus.FAILED, error), error);
         } catch (Exception exception) {
+            if (exception instanceof EntityNotFoundException entityNotFoundException) {
+                log.error("EntityNotFoundException!!!!");
+            }
             errorLogger(exception, this.url);
             errorSaving(RequestStatusCode.REQUEST_DENIED);
         }
     }
 
+    private SiteDto createCanceledSiteDtoWithStatus(SiteStatus status, String error) {
+        return SiteDto.builder()
+                .statusTime(LocalDateTime.now())
+                .siteStatus(status)
+                .lastError(error)
+                .name(this.siteDto.getName())
+                .url(this.siteDto.getUrl())
+                .build();
+    }
+
     private <T extends Exception> void errorLogger(T exception, String url) {
+        if (cancelRecursiveTask)
+            return;
         log.error("Возникло исключение {} при обработке страницы: {}", exception.getClass().getSimpleName(), url);
         log.error("Текст ошибки: {}", exception.getMessage());
     }

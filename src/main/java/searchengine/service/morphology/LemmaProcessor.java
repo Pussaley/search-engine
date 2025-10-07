@@ -56,7 +56,6 @@ public class LemmaProcessor {
                 }
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
-                log.warn("Поток прерван, завершаем транзакцию и освобождаем соединение");
                 throw new CancellationException("Индексация была прервана пользователем");
             }
         }
