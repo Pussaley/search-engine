@@ -81,6 +81,8 @@ public class RecursiveSiteCrawler extends RecursiveAction {
 
         if (newIndexing)
             parsedPages.removeIf(elem -> elem.contains(siteDto.getUrl()));
+
+        cancelRecursiveTask = false;
     }
 
     private Set<String> findChildPages(Document document) {
@@ -199,9 +201,11 @@ public class RecursiveSiteCrawler extends RecursiveAction {
         } catch (Exception exception) {
             if (exception instanceof EntityNotFoundException entityNotFoundException) {
                 log.error("EntityNotFoundException!!!!");
+                log.error("Message: {}", entityNotFoundException.getMessage());
+            } else {
+                errorLogger(exception, this.url);
+                errorSaving(RequestStatusCode.REQUEST_DENIED);
             }
-            errorLogger(exception, this.url);
-            errorSaving(RequestStatusCode.REQUEST_DENIED);
         }
     }
 

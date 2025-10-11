@@ -3,7 +3,6 @@ package searchengine.model.dto.response.search;
 import lombok.Data;
 import lombok.Getter;
 import searchengine.model.dto.response.Response;
-import searchengine.service.search.demo.relevance.Relevancing;
 import searchengine.service.search.demo.relevance.RelevancingPageRel;
 
 @Data

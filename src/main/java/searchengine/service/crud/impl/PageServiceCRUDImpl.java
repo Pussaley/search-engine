@@ -1,11 +1,13 @@
 package searchengine.service.crud.impl;
 
 import jakarta.persistence.EntityManager;
+import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import searchengine.mapper.PageMapper;
 import searchengine.model.entity.PageEntity;
 import searchengine.model.entity.SiteEntity;
@@ -24,6 +26,7 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
 
     private final PageMapper pageMapper;
     private final PageRepository pageRepository;
+    private final SiteServiceCRUDImpl siteService;
     @PersistenceContext
     private final EntityManager entityManager;
 
@@ -70,11 +73,12 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
     }
 
     public synchronized PageDto save(PageDto pageDto) {
+        Long siteId = pageDto.getSite().getId();
         PageEntity pageEntity = pageMapper.toEntity(pageDto);
 
-        SiteEntity site = entityManager.getReference(SiteEntity.class, pageDto.getSite().getId());
-        site.setStatusTime(LocalDateTime.now());
-        pageEntity.setSite(site);
+        siteService.updateStatusTime(siteId);
+        entityManager.flush();
+        pageEntity.setSite(entityManager.getReference(SiteEntity.class, siteId));
 
         PageEntity savedPage = pageRepository.save(pageEntity);
         return pageMapper.toDto(savedPage);
