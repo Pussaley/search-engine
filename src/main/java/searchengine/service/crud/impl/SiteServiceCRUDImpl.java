@@ -50,7 +50,7 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
 
     }
 
-    public synchronized SiteDto update(SiteDto siteDto) {
+    public SiteDto update(SiteDto siteDto) {
         if (Objects.isNull(siteDto.getId()))
             throw new NullPointerException("Поле id не может быть пустым");
 
@@ -68,12 +68,8 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
         return siteRepository.findByName(name).map(siteMapper::toDTO);
     }
 
-    public void updateSiteStatus(Long id, SiteStatus siteStatus) {
-        entityManager.createNativeQuery("update sites as s set s.status = ?, s.status_time = ? where s.id = ?")
-                .setParameter(1, siteStatus.toString())
-                .setParameter(2, LocalDateTime.now())
-                .setParameter(3, id)
-                .executeUpdate();
+    public void updateSiteStatus(Long siteId, SiteStatus siteStatus) {
+        siteRepository.updateSiteStatusBySiteId(siteId, siteStatus);
     }
 
     public void clearDatabaseFromSitePageLemmaIndexEntities(String siteName) {
@@ -95,12 +91,8 @@ public class SiteServiceCRUDImpl implements CRUDService<SiteDto> {
         });
     }
 
-    public synchronized void updateSiteStatusWithError(Long siteId, SiteStatus status, String error) {
-        entityManager.createNativeQuery("update sites as s set s.status = ?, s.status_time = now(), s.last_error = ? where s.id = ?")
-                .setParameter(1, status )
-                .setParameter(2, error)
-                .setParameter(3, siteId)
-                .executeUpdate();
+    public void updateSiteStatusWithError(Long siteId, SiteStatus status, String error) {
+        siteRepository.updateSiteStatusWithErrorBySiteId(siteId, status, error);
     }
 
     public void updateStatusTime(Long siteId) {

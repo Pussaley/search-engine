@@ -47,27 +47,29 @@
 <summary>Через командную строку</summary>
 
 1. Клонировать репозиторий:
-    ```bash
+    ```java
     git clone https://github.com/Pussaley/search-engine.git
     ```
 
 2. Перейти в директорию проекта:
 
-    ```bash
+    ```java
     cd <путь_до_папки_с_проектом>
     ```
 
 3. Собрать проект:
 
-    ```bash
+    ```java
     mvn clean package
     ```
 
-4. Укажите в [application.yaml](src/main/resources/application.yaml) актуальные настройки
-   соединения к Базе данных и желаемый профиль (по умолчанию включен профиль prod)
+4. Укажите в файле-конфигурации [application.yaml](src/main/resources/application.yaml) актуальные настройки
+   соединения к Базе данных и желаемый профиль (по умолчанию включен профиль prod). Затем укажите в
+   в файле-конфигурации [application-prod.yaml](src/main/resources/application-prod.yaml) желаемый список сайтов.
+
 
 5. Запустите приложение:
-    ```bash
+    ```java
     java -jar -Dspring.profiles.active=prod target/SearchEngine-*.jar
     ```
 
