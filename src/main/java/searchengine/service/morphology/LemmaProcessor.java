@@ -1,7 +1,6 @@
 package searchengine.service.morphology;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
@@ -18,7 +17,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
 public class LemmaProcessor {
     private final LemmaFinder lemmaFinder;
     private final LemmaServiceCRUDImpl lemmaService;

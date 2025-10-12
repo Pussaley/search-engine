@@ -1,13 +1,11 @@
 package searchengine.service.crud.impl;
 
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.EntityNotFoundException;
 import jakarta.persistence.PersistenceContext;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.interceptor.TransactionAspectSupport;
 import searchengine.mapper.PageMapper;
 import searchengine.model.entity.PageEntity;
 import searchengine.model.entity.SiteEntity;
@@ -15,7 +13,6 @@ import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.PageRepository;
 import searchengine.service.crud.CRUDService;
 
-import java.time.LocalDateTime;
 import java.util.Optional;
 
 @Service
@@ -66,10 +63,7 @@ public class PageServiceCRUDImpl implements CRUDService<PageDto> {
 
     public void delete(PageDto pageDto) {
         deleteById(pageDto.getId());
-
-        entityManager.createNativeQuery("update sites as s set s.status_time = now() where s.id = ?")
-                .setParameter(1, pageDto.getSite().getId())
-                .executeUpdate();
+        siteService.updateStatusTime(pageDto.getSite().getId());
     }
 
     public synchronized PageDto save(PageDto pageDto) {

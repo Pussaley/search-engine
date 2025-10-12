@@ -20,7 +20,6 @@ import searchengine.service.search.DataSearchService;
 import searchengine.service.statistics.StatisticsService;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
@@ -62,9 +61,9 @@ public class ApiController {
     public ResponseEntity<?> search(@RequestParam String query,
                                     @RequestParam(required = false) String site,
                                     @RequestParam(required = false,
-                                                  defaultValue = "0") String offset,
+                                            defaultValue = "0") String offset,
                                     @RequestParam(required = false,
-                                                  defaultValue = "20") String limit
+                                            defaultValue = "20") String limit
     ) {
         if (query == null || query.trim().isEmpty())
             return ResponseEntity
@@ -75,9 +74,9 @@ public class ApiController {
             Map<Site, List<PageWithRelevanceResponse>> results =
                     site == null
                             ? sitesList.getSites().stream()
-                                    .collect(Collectors.toMap(
-                                            Function.identity(),
-                                            (s) -> dataSearchService.findRelevancedPages(query, s.getUrl())))
+                            .collect(Collectors.toMap(
+                                    Function.identity(),
+                                    (s) -> dataSearchService.findRelevancedPages(query, s.getUrl())))
                             : dataSearchService.searchAsMap(query, site);
 
             Long totalCount = results.values()
@@ -94,13 +93,16 @@ public class ApiController {
                                     page.getTitle(),
                                     page.getSnippet(),
                                     page.getRelevance()))
-                            .skip(Long.parseLong(offset))
-                            .limit(Long.parseLong(limit))
                             .forEach(data::add));
 
             data.sort(Comparator.comparing(RelevanceData::getRelevance).reversed());
 
-            return ResponseEntity.ok(new DataSearchResponse(true, totalCount.intValue(), data));
+            return ResponseEntity.ok(new DataSearchResponse(
+                    true,
+                    totalCount.intValue(),
+                    data.stream()
+                            .skip(Integer.parseInt(offset))
+                            .limit(Integer.parseInt(limit)).toList()));
         } catch (Exception exception) {
             log.error("Исключение при выполнении поиска: {}", exception.getMessage());
             exception.printStackTrace();

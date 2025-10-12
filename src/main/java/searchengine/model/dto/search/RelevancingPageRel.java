@@ -1,4 +1,4 @@
-package searchengine.service.search.demo.relevance;
+package searchengine.model.dto.search;
 
 import lombok.Getter;
 

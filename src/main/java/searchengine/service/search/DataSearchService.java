@@ -1,12 +1,15 @@
 package searchengine.service.search;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.model.dto.response.search.PageWithRelevanceResponse;
-import searchengine.model.dto.search.PageWithRelevance;
+import searchengine.model.dto.search.RelevancingPageAbs;
+import searchengine.model.dto.search.RelevancingPageRel;
+import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.dto.LemmaDto;
 import searchengine.model.entity.dto.PageDto;
 import searchengine.repository.DataSearchDAO;
@@ -14,6 +17,7 @@ import searchengine.util.morphology.LemmaFinder;
 import searchengine.util.morphology.SnippetGenerator;
 import searchengine.util.text.TextUtils;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.Iterator;
@@ -61,21 +65,58 @@ public class DataSearchService {
     }
 
     private List<PageWithRelevanceResponse> convertPagesIntoRelevancedPages(String query, List<PageDto> pages, List<String> lemmas) {
-        List<PageWithRelevance> result = pages.stream()
-                .map(page -> new PageWithRelevance(page, searchDAO.findIndexesByPageIdAndLemmas(page.getId(), lemmas)))
-                .toList();
+        Map<PageDto, List<IndexDto>> data = pages.stream().collect(Collectors.toMap(
+                Function.identity(),
+                pageDto -> searchDAO.findIndexesByPageIdAndLemmas(pageDto.getId(), lemmas)
+        ));
 
-        return result.stream()
-                .map(pageWithRelevance -> {
-                    String content = pageWithRelevance.getPage().getContent();
-
-                    return new PageWithRelevanceResponse(
-                            pageWithRelevance.getPage().getPath(),
-                            textUtils.formTitle(content),
-                            snippetGenerator.generateSnippet(content, query),
-                            pageWithRelevance.getRelRelevance());
-                })
+        List<RelevancingPageRel> list = new RelevancedPageConverter(data, query).get();
+        return list.stream()
+                .map(PageWithRelevanceResponse::new)
                 .toList();
+    }
+
+    class RelevancedPageConverter {
+
+        private final List<RelevancingPageAbs> list = new ArrayList<>();
+        private final String query;
+
+        RelevancedPageConverter(Map<PageDto, List<IndexDto>> data, String query) {
+            this.query = query;
+            calculate(data);
+        }
+
+        List<RelevancingPageRel> get() {
+            return list.stream()
+                    .map(page -> new RelevancingPageRel(
+                            page,
+                            MaxRelevance.getValue()))
+                    .toList();
+        }
+
+        private void calculate(Map<PageDto, List<IndexDto>> data) {
+            for (Map.Entry<PageDto, List<IndexDto>> entry : data.entrySet()) {
+                PageDto pageDto = entry.getKey();
+                List<IndexDto> indexes = entry.getValue();
+
+                float absRelevance = indexes.stream().map(IndexDto::getRank).reduce((float) 0, Float::sum);
+                list.add(new RelevancingPageAbs(
+                        pageDto.getPath(),
+                        textUtils.formTitle(pageDto.getContent()),
+                        snippetGenerator.generateSnippet(pageDto.getContent(), query),
+                        absRelevance));
+                MaxRelevance.save(absRelevance);
+            }
+        }
+
+        private static class MaxRelevance {
+            @Getter
+            private static float value = 0;
+
+            public static void save(float newVal) {
+                value = Math.max(value, newVal);
+            }
+        }
     }
 
     private List<LemmaDto> findLemmaDtosSortedByFrequency(Long siteId, List<String> lemmas, Integer pagesCount) {

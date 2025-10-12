@@ -1,6 +1,5 @@
 package searchengine.service.recursive;
 
-import jakarta.persistence.EntityNotFoundException;
 import lombok.Getter;
 import lombok.Setter;
 import lombok.extern.slf4j.Slf4j;
@@ -199,13 +198,8 @@ public class RecursiveSiteCrawler extends RecursiveAction {
             final String error = "Индексация отменена пользователем";
             throw new IndexingCancelledByUserException(createCanceledSiteDtoWithStatus(SiteStatus.FAILED, error), error);
         } catch (Exception exception) {
-            if (exception instanceof EntityNotFoundException entityNotFoundException) {
-                log.error("EntityNotFoundException!!!!");
-                log.error("Message: {}", entityNotFoundException.getMessage());
-            } else {
-                errorLogger(exception, this.url);
-                errorSaving(RequestStatusCode.REQUEST_DENIED);
-            }
+            errorLogger(exception, this.url);
+            errorSaving(RequestStatusCode.REQUEST_DENIED);
         }
     }
 

@@ -25,7 +25,6 @@ import searchengine.service.recursive.RecursiveSiteCrawler;
 import searchengine.util.jsoup.JSOUPParser;
 import searchengine.util.url.UrlNormalizer;
 
-import java.text.MessageFormat;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Map;
@@ -44,7 +43,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 @Service
 @Slf4j
 public class IndexingServiceImpl implements IndexingService<Response> {
-
     private final JSOUPParser jsoupParser;
     private final UrlNormalizer urlNormalizer;
     private final ConcurrencyProperties concurrencyProperties;
@@ -206,21 +204,21 @@ public class IndexingServiceImpl implements IndexingService<Response> {
             Document document = response.parse();
 
             pageService.findByPathAndSiteId(rawPath, siteDto.getId())
-                    .ifPresentOrElse(page -> {
-                        throw new RuntimeException(MessageFormat.format("Страница {0} уже существует в Базе", page));
-                    }, () -> {
-                        PageDto savedPage = pageService.save(PageDto.builder()
-                                .site(siteDto)
-                                .content(document.html())
-                                .path(rawPath)
-                                .code(statusCode).build());
+                    .ifPresentOrElse(page -> log.warn("Страница {} уже существует в Базе", page.getPath()),
+                            () -> {
+                                PageDto savedPage = pageService.save(PageDto.builder()
+                                        .site(siteDto)
+                                        .content(document.html())
+                                        .path(rawPath)
+                                        .code(statusCode).build());
 
-                        lemmaProcessor.processLemmas(siteDto, savedPage);
-                    });
+                                lemmaProcessor.processLemmas(siteDto, savedPage);
+                            });
 
             return new IndexingResultResponse(siteDto, SiteStatus.INDEXED, null);
-        } catch (Exception e) {
-            throw new CompletionException(e);
+        } catch (Exception exception) {
+            log.error("Не удалось проиндексировать страницу {}. Возникло исключение: {}", url, exception.getMessage());
+            throw new CompletionException(exception);
         }
     }
 
