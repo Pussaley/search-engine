@@ -1,0 +1,25 @@
+package searchengine.model.dto.search;
+
+import lombok.Getter;
+
+@Getter
+public class RelevancingPageRel extends Relevancing {
+    private final String uri;
+    private final String title;
+    private final String snippet;
+    private final float relRelevance;
+
+    public RelevancingPageRel(RelevancingPageRel relevancingPageRel) {
+        this.uri = relevancingPageRel.getUri();
+        this.title = relevancingPageRel.getTitle();
+        this.snippet = relevancingPageRel.getSnippet();
+        this.relRelevance = relevancingPageRel.getRelRelevance();
+    }
+
+    public RelevancingPageRel(RelevancingPageAbs relevancingPage, float absRelevance) {
+        this.uri = relevancingPage.getUri();
+        this.title = relevancingPage.getTitle();
+        this.snippet = relevancingPage.getSnippet();
+        this.relRelevance = relevancingPage.getRelRelevance() / absRelevance;
+    }
+}

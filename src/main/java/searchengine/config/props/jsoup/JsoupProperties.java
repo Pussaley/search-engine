@@ -2,7 +2,6 @@ package searchengine.config.props.jsoup;
 
 import lombok.Data;
 import org.springframework.boot.context.properties.ConfigurationProperties;
-import searchengine.config.props.jsoup.JsoupHeader;
 
 import java.util.List;
 import java.util.Map;

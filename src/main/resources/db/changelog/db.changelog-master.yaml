@@ -1,0 +1,7 @@
+databaseChangeLog:
+  - includeAll:
+      path: db/changelog/changeset/v1/init/create
+  - includeAll:
+      path: db/changelog/changeset/v1/init/foreignKeys
+  - includeAll:
+      path: db/changelog/changeset/v1/init/indexes

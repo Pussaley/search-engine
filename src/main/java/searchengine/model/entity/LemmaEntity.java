@@ -7,6 +7,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToMany;
@@ -22,18 +23,28 @@ import java.util.Set;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-@Table(name = "lemmas")
+@Table(name = "lemmas",
+        indexes = @Index(
+                name = "idx_lemma_siteId_unique",
+                columnList = "lemma, site_id",
+                unique = true
+        )
+)
 public class LemmaEntity {
     @Id
-    @GeneratedValue(strategy = GenerationType.AUTO)
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "lemma", nullable = false)
     private String lemma;
-    @Column(name = "frequency", nullable = false)
-    private Integer frequency;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
-    @OneToMany(cascade = CascadeType.REMOVE)
+
+    @Column(name = "frequency", nullable = false)
+    private Integer frequency;
+
+    @OneToMany(mappedBy = "lemma", fetch = FetchType.LAZY, cascade = CascadeType.REMOVE)
     private Set<IndexEntity> indexes = new HashSet<>();
 }

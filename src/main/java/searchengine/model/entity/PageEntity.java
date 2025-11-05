@@ -28,15 +28,20 @@ public class PageEntity {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
     @Column(name = "path", columnDefinition = "VARCHAR(255)", nullable = false, length = 768)
     private String path;
+
     @Column(name = "code", nullable = false)
     private Integer code;
+
     @Column(name = "content", columnDefinition = "LONGTEXT")
     private String content;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "site_id", nullable = false)
     private SiteEntity site;
-    @OneToMany(cascade = CascadeType.REMOVE)
+
+    @OneToMany(fetch = FetchType.LAZY, mappedBy = "page", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<IndexEntity> indexes = new HashSet<>();
 }

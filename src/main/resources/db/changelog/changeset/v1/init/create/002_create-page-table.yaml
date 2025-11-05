@@ -1,0 +1,34 @@
+databaseChangeLog:
+  - changeSet:
+      id: 2
+      author: pussaley
+      changes:
+        - createTable:
+            tableName: pages
+            columns:
+              - column:
+                  name: id
+                  type: bigint
+                  autoIncrement: true
+                  constraints:
+                    primaryKey: true
+              - column:
+                  name: site_id
+                  type: bigint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: path
+                  type: varchar(255)
+                  constraints:
+                    nullable: false
+              - column:
+                  name: code
+                  type: smallint
+                  constraints:
+                    nullable: false
+              - column:
+                  name: content
+                  type: longtext
+                  constraints:
+                    nullable: false

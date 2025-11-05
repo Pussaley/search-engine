@@ -1,0 +1,17 @@
+databaseChangeLog:
+  - changeSet:
+      id: 10
+      author: pussaley
+      changes:
+        - addForeignKeyConstraint:
+            constraintName: fk_pages_site_id
+            baseTableName: pages
+            baseColumnNames: site_id
+            referencedTableName: sites
+            referencedColumnNames: id
+        - addForeignKeyConstraint:
+            constraintName: fk_lemmas_site_id
+            baseTableName: lemmas
+            baseColumnNames: site_id
+            referencedTableName: sites
+            referencedColumnNames: id

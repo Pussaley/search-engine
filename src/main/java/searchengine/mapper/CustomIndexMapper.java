@@ -1,23 +1,21 @@
 package searchengine.mapper;
 
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import searchengine.model.entity.IndexEntity;
 import searchengine.model.entity.LemmaEntity;
 import searchengine.model.entity.PageEntity;
 import searchengine.model.entity.dto.IndexDto;
 import searchengine.model.entity.key.IndexEntityId;
-import searchengine.service.impl.LemmaServiceImpl;
-import searchengine.service.impl.PageServiceImpl;
+import searchengine.service.crud.impl.LemmaServiceCRUDImpl;
+import searchengine.service.crud.impl.PageServiceCRUDImpl;
 
 @Component
 @RequiredArgsConstructor
-@Slf4j
 public class CustomIndexMapper {
 
-    private final PageServiceImpl pageService;
-    private final LemmaServiceImpl lemmaService;
+    private final PageServiceCRUDImpl pageService;
+    private final LemmaServiceCRUDImpl lemmaService;
 
     public IndexEntity toEntity(IndexDto indexDto) {
         IndexEntity indexEntity = new IndexEntity();
@@ -37,6 +35,7 @@ public class CustomIndexMapper {
         return IndexDto.builder()
                 .pageId(indexEntity.getPage().getId())
                 .lemmaId(indexEntity.getLemma().getId())
+                .rank(indexEntity.getRank())
                 .build();
     }
 }
